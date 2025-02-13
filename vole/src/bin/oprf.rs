@@ -2,6 +2,8 @@ extern crate psiri_vole;
 extern crate lambdaworks_math;
 extern crate rayon;
 extern crate clap;
+extern crate rand;
+extern crate rand_chacha;
 
 use clap::{Command, Arg};
 use psiri_vole::socket_channel::TcpChannel;
@@ -9,16 +11,24 @@ use psiri_vole::comm_channel::CommunicationChannel;
 use psiri_vole::psi_sender::OprfSender;
 use psiri_vole::psi_receiver::OprfReceiver;
 use psiri_vole::vole_triple::*;
-use psiri_vole::utils::rand_field_element;
 use std::net::{TcpStream, TcpListener};
 use std::time::Instant;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
+use lambdaworks_math::unsigned_integer::element::UnsignedInteger;
 use rayon::ThreadPoolBuilder;
 use rayon::current_num_threads;
+use rand::prelude::*;
+use rand_chacha::rand_core::{SeedableRng, RngCore};
+use rand_chacha::ChaCha12Rng;
 
 pub type F = Stark252PrimeField;
 pub type FE = FieldElement<F>;
+
+pub fn gen_input(rng: &mut ChaCha12Rng) -> FE {
+    let rand_big = UnsignedInteger {limbs: [rng.next_u64(), rng.next_u64(), rng.next_u64(), rng.next_u64()]} ;
+    FE::new(rand_big)
+}
 
 fn main() {
     // Command-line argument parsing
@@ -105,7 +115,11 @@ fn main() {
             .expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
 
-        let data = channel.receive_stark252().expect("Failed to receive data from receiver");
+        let seed = channel.receive_block::<16>().expect("Failed to receive seed from receiver");
+        let mut rng = ChaCha12Rng::from_seed(Default::default());
+        let data = (0..size).map(|_| gen_input(&mut rng)).collect::<Vec<FE>>();
+
+        println!("Started PSI");
 
         let mut oprf = OprfSender::new(&mut channel, size, committed, param, &mut comm);
 
@@ -126,9 +140,14 @@ fn main() {
         let mut channel = TcpChannel::new(stream);
 
         // Send data to Sender for test
-        let data = (0..size).map(|_| rand_field_element()).collect::<Vec<FE>>();
+        let mut seed = [0u8; 16];
+        let mut rng_seed = rand::thread_rng();
+        rng_seed.fill(&mut seed);
+        let mut rng = ChaCha12Rng::from_seed(Default::default());
+        let data = (0..size).map(|_| gen_input(&mut rng)).collect::<Vec<FE>>();
 
-        channel.send_stark252(&data).expect("Failed to send data to sender");
+        channel.send_block::<16>(&[seed]).expect("Failed to send seed to sender");
+        println!("Started PSI");
 
         let start_protocol = Instant::now();
 
