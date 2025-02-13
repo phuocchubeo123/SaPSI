@@ -91,13 +91,9 @@ fn main() {
     if params_idx == 0 {
         param = LPN17;
     } else if params_idx == 1{
-        param = LPN19;
-    } else if params_idx == 2 {
-        param = LPN20;
-    } else if params_idx == 3 {
         param = LPN21;
-    } else if params_idx == 4 {
-        param = THREE_MILLION_LPN;
+    } else if params_idx == 2 {
+        param = LPN25;
     }
 
     let mut comm: u64 = 0;

@@ -2,7 +2,7 @@ extern crate psiri_vole;
 extern crate lambdaworks_math;
 
 use psiri_vole::socket_channel::TcpChannel;
-use psiri_vole::vole_triple::{VoleTriple, MILLION_LPN};
+use psiri_vole::vole_triple::{VoleTriple, LPN17};
 use psiri_vole::utils::rand_field_element;
 use std::net::{TcpListener, TcpStream};
 use std::env;
@@ -25,7 +25,7 @@ fn main() {
         let (stream, _) = listener.accept().expect("Failed to accept connection");
         let mut channel = TcpChannel::new(stream);
 
-        let mut vole = VoleTriple::new(1, true, &mut channel, MILLION_LPN, &mut comm);
+        let mut vole = VoleTriple::new(1, true, &mut channel, LPN17, &mut comm);
         
         let start = Instant::now();
         vole.setup_receiver(&mut channel, &mut comm);
@@ -44,7 +44,7 @@ fn main() {
         let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
 
-        let mut vole = VoleTriple::new(0, true, &mut channel, MILLION_LPN, &mut comm);
+        let mut vole = VoleTriple::new(0, true, &mut channel, LPN17, &mut comm);
 
         let delta = rand_field_element();
         vole.setup_sender(&mut channel, delta, &mut comm);

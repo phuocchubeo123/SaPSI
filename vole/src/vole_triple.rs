@@ -97,55 +97,16 @@ pub const LPN17: PrimalLPNParameterFp61 = PrimalLPNParameterFp61 {
     n_pre0: 1800, t_pre0: 225, k_pre0: 600, log_bin_sz_pre0: 3,
 };
 
-pub const LPN19: PrimalLPNParameterFp61 = PrimalLPNParameterFp61 {
-    n: 675328, t: 1319, k: 50000, log_bin_sz: 9,
-    n_pre: 160512, t_pre: 2508, k_pre: 19870, log_bin_sz_pre: 6,
-    n_pre0: 22400, t_pre0: 700, k_pre0: 2000, log_bin_sz_pre0: 5,
-};
-
-pub const LPN20: PrimalLPNParameterFp61 = PrimalLPNParameterFp61 {
-    n: 1228800,
-    t: 1200,
-    k: 70000,
-    log_bin_sz: 10,
-    n_pre: 160512,
-    t_pre: 2508,
-    k_pre: 19870,
-    log_bin_sz_pre: 6,
-    n_pre0: 22400,
-    t_pre0: 700,
-    k_pre0: 2000,
-    log_bin_sz_pre0: 5,
-};
-
 pub const LPN21: PrimalLPNParameterFp61 = PrimalLPNParameterFp61 {
-    n: 2701312,
-    t: 1319,
-    k: 130000,
-    log_bin_sz: 11,
-    n_pre: 160512,
-    t_pre: 2508,
-    k_pre: 19870,
-    log_bin_sz_pre: 6,
-    n_pre0: 22400,
-    t_pre0: 700,
-    k_pre0: 2000,
-    log_bin_sz_pre0: 5,
+    n: 2201600, t: 1075, k: 120000, log_bin_sz: 11,
+    n_pre: 122112, t_pre: 954, k_pre: 8000, log_bin_sz_pre: 7,
+    n_pre0: 10304, t_pre0: 644, k_pre0: 1120, log_bin_sz_pre0: 4,
 };
 
-pub const THREE_MILLION_LPN: PrimalLPNParameterFp61 = PrimalLPNParameterFp61 {
-    n: 3686400,
-    t: 900,
-    k: 250000,
-    log_bin_sz: 12,
-    n_pre: 307200,
-    t_pre: 1200,
-    k_pre: 20000,
-    log_bin_sz_pre: 8,
-    n_pre0: 22400,
-    t_pre0: 700,
-    k_pre0: 2000,
-    log_bin_sz_pre0: 5,
+pub const LPN25: PrimalLPNParameterFp61 = PrimalLPNParameterFp61 {
+    n: 33751040, t: 1030, k: 1700000, log_bin_sz: 15,
+    n_pre: 1710080, t_pre: 1670, k_pre: 70000, log_bin_sz_pre: 10,
+    n_pre0: 73088, t_pre0: 1142, k_pre0: 4200, log_bin_sz_pre0: 6,
 };
 
 pub struct VoleTriple {
