@@ -23,7 +23,6 @@ impl PRP {
             let mut rng = rand::thread_rng();
             rng.fill(&mut aes_key);
         }
-        println!("AES key: {:?}", aes_key);
 
         let aes = Aes128::new(GenericArray::from_slice(&aes_key));
 

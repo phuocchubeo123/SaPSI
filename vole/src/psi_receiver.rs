@@ -157,9 +157,12 @@ impl OprfReceiver {
 
         // Running Vole
         // c = b + a * delta
+        let start = Instant::now();
         let mut a = vec![FE::zero(); self.fixed_points_num];
         let mut c = vec![FE::zero(); self.fixed_points_num];    
         self.vole_receiver.extend(io, &mut c, &mut a, self.fixed_points_num, comm);
+
+        println!("Doing VOLE took {:?}", start.elapsed());
 
         // Generate random coin if malicious
         let mut wr = FE::zero();
@@ -191,8 +194,11 @@ impl OprfReceiver {
         for i in 0..self.fixed_points_num {
             A[i] = self.P[i] + a[i];
         }
+
+        let start = Instant::now();
         // Send A = P + a to the sender
         *comm += io.send_stark252(&A).expect("Failed to send A to the sender");
+        println!("Sending A took {:?}", start.elapsed());
 
         self.prepare_vole_consistency();
 
