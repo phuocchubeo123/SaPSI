@@ -1,5 +1,5 @@
 # PICS
-The first Malicious PSI protocol that supports both-side input consistency. 
+This is a Rust implementation for the Private Intersection over Committed Sets (PICS) protocol in the paper *Does Malicious Security Suffice for\\ Private Set Intersection?*
 
 # How to use
 The project contains many bin files that is used to test each small part.
@@ -11,5 +11,5 @@ Currently, we support three sets of LPN parameters: LPN17, LPN21, LPN25 (corresp
 # This code adapts from
 1. Wolverine: https://github.com/emp-toolkit/emp-zk.git
 2. RB-OKVS: https://github.com/felicityin/rb-okvs.git
-3. VOLE PSI: https://github.com/Visa-Research/volepsi.git
+3. VOLE-PSI: https://github.com/Visa-Research/volepsi.git
 4. lambdaworks: https://github.com/lambdaclass/lambdaworks.git
