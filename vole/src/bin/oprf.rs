@@ -87,6 +87,11 @@ fn main() {
     let num_threads = matches.get_one::<String>("threads").unwrap().parse::<usize>().unwrap();
     let params_idx = matches.get_one::<String>("params").unwrap().parse::<usize>().unwrap();
     let committed = matches.get_one::<String>("committed").unwrap().parse::<usize>().unwrap() != 0;
+
+    let available_num_threads = vec![1, 2, 4, 8, 16, 32, 64];
+    if !available_num_threads.contains(&num_threads) {
+        panic!("Currently we only support threads number to be power of 2.");
+    }
     
     ThreadPoolBuilder::new()
         .num_threads(num_threads) // Adjust the number of threads as needed
