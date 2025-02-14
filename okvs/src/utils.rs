@@ -67,6 +67,7 @@ pub fn simple_gauss(
     }
 
     let mut first_nonzero = vec![band_width; rows];
+    let mut skip_num = 0;
 
     for i in 0..rows {
         let y_i = y[i].clone();
@@ -94,6 +95,7 @@ pub fn simple_gauss(
         }
 
         if cnt == 0 {
+            skip_num += 1;
             continue;
         }
 
@@ -135,6 +137,8 @@ pub fn simple_gauss(
             }
         }
     }
+
+    println!("Number of leading coefficients skipped: {}", skip_num);
 
     // clean up rows with non_unit leading coeffiicients
     bands_FE.par_iter_mut().zip(y.par_iter_mut()).enumerate().for_each(|(i, (band_i, y_i))| {
