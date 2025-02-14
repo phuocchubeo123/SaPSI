@@ -1,11 +1,15 @@
 # VOLERust
 Reimplement VOLE in Rust
 
-## References
+# How to use
+The project contains many bin files that is used to test each small part.
+For running the PSI protocol as a proof-of-work, please use the following command:
+> cargo run --release --bin oprf (role) (ip) (port) (log_set_size) (num_threads) (lpn_param) (committed)
+
+Currently, we support three sets of LPN parameters: LPN17, LPN21, LPN25, which are suitable for running $2^17$, $2^21$, and $2^25$ VOLEs.
+
+# This code adapts from
 1. Wolverine: https://github.com/emp-toolkit/emp-zk.git
 2. RB-OKVS: https://github.com/felicityin/rb-okvs.git
-
-## TODO: 
-1. Currently I use very slow block operation that is implemented by hand. I have plan to revamp it using RustCrypto cipher library that implemented blocks later soon. (not urgent)
-2. The index hash function in okvs does not have randomness (Resolved)
-3. Seeds for LPN are not random (URGENT)
+3. VOLE PSI: https://github.com/Visa-Research/volepsi.git
+4. lambdaworks: https://github.com/lambdaclass/lambdaworks.git
