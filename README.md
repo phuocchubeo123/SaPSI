@@ -1,5 +1,5 @@
 # PICS
-This is a Rust implementation for the Private Intersection over Committed Sets (PICS) protocol in the paper *Does Malicious Security Suffice for\\ Private Set Intersection?*
+This is a Rust implementation for the Private Intersection over Committed Sets (PICS) protocol in the paper *Does Malicious Security Suffice for Private Set Intersection?*
 
 # How to use
 The project contains many bin files that is used to test each small part.
