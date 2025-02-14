@@ -1,5 +1,5 @@
-# VOLERust
-Reimplement VOLE in Rust
+# PICS
+The first Malicious PSI protocol that supports both-side input consistency. 
 
 # How to use
 The project contains many bin files that is used to test each small part.
