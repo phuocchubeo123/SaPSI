@@ -1,6 +1,6 @@
-extern crate psiri_aes;
+extern crate psi_aes;
 
-use psiri_aes::hash::CCRH;
+use psi_aes::hash::CCRH;
 use std::time::Instant;
 
 fn benchmark_ccrh() {

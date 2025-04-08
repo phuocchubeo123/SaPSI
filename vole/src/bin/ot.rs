@@ -1,7 +1,7 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 
-use psiri_vole::ot::OTCO;
-use psiri_vole::socket_channel::TcpChannel;
+use psi_vole::ot::OTCO;
+use psi_vole::socket_channel::TcpChannel;
 use std::env;
 use std::net::{TcpListener, TcpStream};
 

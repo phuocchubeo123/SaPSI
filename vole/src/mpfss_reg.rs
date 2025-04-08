@@ -2,8 +2,8 @@ use crate::preot::OTPre;
 use crate::comm_channel::CommunicationChannel;
 use crate::spfss_sender::SpfssSenderFp;
 use crate::spfss_receiver::SpfssRecverFp;
-use psiri_aes::prg::PRG;
-use psiri_aes::hash::Hash;
+use psi_aes::prg::PRG;
+use psi_aes::hash::Hash;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::traits::ByteConversion;
@@ -188,7 +188,7 @@ impl MpfssReg {
             sd = io.receive_block::<16>().expect("Failed to receive seed")[0];
         } else {
             let mut sd_buf = vec![[0u8; 16]; 1];
-            self.prg.random_block(&mut sd_buf);
+            self.prg.random_16byte_block(&mut sd_buf);
             sd = sd_buf[0].clone();
             *comm += io.send_block::<16>(&[sd]).expect("Failed to send seed");
         }

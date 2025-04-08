@@ -147,7 +147,7 @@ impl CCRH {
 }
 
 /// A helper function to simulate sigma operation
-// I think it can be arbitrary. Check later: https://eprint.iacr.org/2019/074.pdf
+// I think it can be arbitrary: https://eprint.iacr.org/2019/074.pdf
 fn sigma(input: &[u8; 32]) -> [u8; 32] {
     let mut output = [0u8; 32];
 

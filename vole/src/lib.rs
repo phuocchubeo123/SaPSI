@@ -1,7 +1,7 @@
 #![allow(warnings)]
 
-extern crate psiri_okvs;
-extern crate psiri_aes;
+extern crate psi_okvs;
+extern crate psi_aes;
 extern crate lambdaworks_math;
 extern crate lambdaworks_crypto;
 extern crate stark_platinum_prover;

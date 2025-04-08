@@ -1,6 +1,6 @@
 use crate::utils::*;
 use crate::comm_channel::CommunicationChannel;
-use psiri_aes::prg::{PRG};
+use psi_aes::prg::{PRG};
 use lambdaworks_math::polynomial;
 use lambdaworks_math::traits::ByteConversion;
 use lambdaworks_math::fft::cpu::bit_reversing::{in_place_bit_reverse_permute, reverse_index};

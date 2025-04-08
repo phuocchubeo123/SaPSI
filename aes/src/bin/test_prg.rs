@@ -1,9 +1,9 @@
-extern crate psiri_aes;
+extern crate psi_aes;
 extern crate lambdaworks_math;
 extern crate rand;
 extern crate aes;
 
-use psiri_aes::prg::PRG;
+use psi_aes::prg::PRG;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use std::time::Instant;
@@ -60,7 +60,7 @@ fn main() {
     let mut prg = PRG::new(None, 0);
 
     let start = Instant::now();
-    prg.random_block(&mut new_blocks);
+    prg.random_16byte_block(&mut new_blocks);
     let duration_parallel = start.elapsed();
     println!(
         "Time to encrypt {} blocks with random_block: {:?}",

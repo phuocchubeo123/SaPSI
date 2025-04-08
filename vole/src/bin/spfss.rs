@@ -1,13 +1,13 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate lambdaworks_math;
 extern crate rand;
 
-use psiri_vole::spfss_sender::SpfssSenderFp;
-use psiri_vole::spfss_receiver::SpfssRecverFp;
-use psiri_vole::comm_channel::CommunicationChannel;
-use psiri_vole::socket_channel::TcpChannel;
-use psiri_vole::base_cot::BaseCot;
-use psiri_vole::preot::OTPre;
+use psi_vole::spfss_sender::SpfssSenderFp;
+use psi_vole::spfss_receiver::SpfssRecverFp;
+use psi_vole::comm_channel::CommunicationChannel;
+use psi_vole::socket_channel::TcpChannel;
+use psi_vole::base_cot::BaseCot;
+use psi_vole::preot::OTPre;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::unsigned_integer::element::UnsignedInteger;

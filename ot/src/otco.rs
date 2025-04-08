@@ -1,5 +1,7 @@
+#![allow(non_snake_case)]
+
 use psi_aes::hash::Hash;
-use crate::comm_channel::CommunicationChannel;
+use psi_network::comm_channel::CommunicationChannel;
 use p256::elliptic_curve::sec1::{ToEncodedPoint, FromEncodedPoint};
 use p256::elliptic_curve::{Field, Group}; 
 use p256::{Scalar, AffinePoint, ProjectivePoint};
@@ -13,6 +15,7 @@ impl OTCO {
     }
 
     /// Sender's OT implementation
+    /// Messages are always 128 bits long [u8; 16]
     pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, data0: &[[u8; 16]], data1: &[[u8; 16]], comm: &mut u64) {
         let length = data0.len();
         let mut rng = rand::thread_rng();
@@ -50,7 +53,10 @@ impl OTCO {
             BA_points[i] = B_a + A_a_inverse;
         }
 
-        io.flush();
+        let io_flush = io.flush();
+        if io_flush.is_err() {
+            println!("Error flushing IO: {:?}", io_flush);
+        }
 
         // Encrypt and send the data
         for i in 0..length {
@@ -71,6 +77,7 @@ impl OTCO {
     }
 
     /// Receiver's OT implementation
+    /// Messages are always 128 bits long [u8; 16]
     pub fn recv<IO: CommunicationChannel>(&mut self, io: &mut IO, choices: &[bool], output: &mut Vec<[u8; 16]>, comm: &mut u64) {
         let length = choices.len();
         let mut rng = rand::thread_rng();
@@ -96,7 +103,10 @@ impl OTCO {
             *comm += io.send_point(&B_encoded).expect("Cannot send B encoded");
         }
 
-        io.flush();
+        let io_flush = io.flush();
+        if io_flush.is_err() {
+            println!("Error flushing IO: {:?}", io_flush);
+        }
 
         // Compute shared points and decrypt data
         for i in 0..length {

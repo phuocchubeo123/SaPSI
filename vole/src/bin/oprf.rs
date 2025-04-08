@@ -1,4 +1,4 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate lambdaworks_math;
 extern crate rayon;
 extern crate clap;
@@ -6,11 +6,11 @@ extern crate rand;
 extern crate rand_chacha;
 
 use clap::{Command, Arg};
-use psiri_vole::socket_channel::TcpChannel;
-use psiri_vole::comm_channel::CommunicationChannel;
-use psiri_vole::psi_sender::OprfSender;
-use psiri_vole::psi_receiver::OprfReceiver;
-use psiri_vole::vole_triple::*;
+use psi_vole::socket_channel::TcpChannel;
+use psi_vole::comm_channel::CommunicationChannel;
+use psi_vole::psi_sender::OprfSender;
+use psi_vole::psi_receiver::OprfReceiver;
+use psi_vole::vole_triple::*;
 use std::net::{TcpStream, TcpListener};
 use std::time::Instant;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;

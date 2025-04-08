@@ -1,14 +1,14 @@
 [package]
-name = "psiri-vole"
+name = "psi-vole"
 version = "0.1.0"
 
 [lib]
-name = "psiri_vole"
+name = "psi_vole"
 path = "src/lib.rs"
 
 [dependencies]
-psiri-okvs = { workspace = true }
-psiri-aes = { workspace = true }
+psi-okvs = { workspace = true }
+psi-aes = { workspace = true }
 lambdaworks-math = { git = "https://github.com/lambdaclass/lambdaworks.git", package = "lambdaworks-math" }
 lambdaworks-crypto = { git = "https://github.com/lambdaclass/lambdaworks.git", package = "lambdaworks-crypto", features = ["parallel"], optional = true}
 stark-platinum-prover = { git = "https://github.com/lambdaclass/lambdaworks.git", package = "stark-platinum-prover"}

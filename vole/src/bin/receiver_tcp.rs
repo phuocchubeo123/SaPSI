@@ -1,9 +1,9 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate lambdaworks_math;
 
 use std::net::{TcpListener, TcpStream};
-use psiri_vole::comm_channel::CommunicationChannel;
-use psiri_vole::socket_channel::TcpChannel;
+use psi_vole::comm_channel::CommunicationChannel;
+use psi_vole::socket_channel::TcpChannel;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use std::time::Instant;

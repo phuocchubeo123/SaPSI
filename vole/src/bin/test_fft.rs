@@ -1,10 +1,10 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate lambdaworks_math;
 extern crate stark_platinum_prover;
 extern crate rayon;
 
-use psiri_vole::utils::{rand_field_element, parallel_fft};
-use psiri_vole::fri::fold_polynomial;
+use psi_vole::utils::{rand_field_element, parallel_fft};
+use psi_vole::fri::fold_polynomial;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::fft::cpu::bit_reversing::{in_place_bit_reverse_permute, reverse_index};

@@ -7,3 +7,4 @@ pub mod hash;
 pub mod prg;
 pub mod two_key_prp;
 pub mod prp;
+pub mod ccrh;

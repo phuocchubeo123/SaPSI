@@ -1,9 +1,9 @@
 [package]
-name = "psiri-okvs"
+name = "psi-okvs"
 version = "0.1.0"
 
 [dependencies]
-psiri-aes = { workspace = true }
+psi-aes = { workspace = true }
 lambdaworks_math = { git = "https://github.com/lambdaclass/lambdaworks.git", package = "lambdaworks-math" }
 sp-core = "26.0"
 thiserror = "1.0"

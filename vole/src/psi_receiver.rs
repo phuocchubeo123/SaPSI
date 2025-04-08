@@ -2,10 +2,10 @@ use crate::fri::*;
 use crate::comm_channel::CommunicationChannel;  
 use crate::vole_triple::{VoleTriple, PrimalLPNParameterFp61};
 use crate::utils::{parallel_fft, parallel_ifft, get_roots_of_unity};
-use psiri_aes::prg::PRG;
-use psiri_aes::prp::FieldPRP;
-use psiri_okvs::types::{Okvs, Pair};
-use psiri_okvs::okvs::RbOkvs;
+use psi_aes::prg::PRG;
+use psi_aes::prp::FieldPRP;
+use psi_okvs::types::{Okvs, Pair};
+use psi_okvs::okvs::RbOkvs;
 use rand::Rng;
 use sha3::{Digest, Keccak256};
 use std::convert::TryInto;
@@ -53,7 +53,7 @@ impl OprfReceiver {
         // Setup OKVS seed
         let mut prg = PRG::new(None, 0);
         let mut r = [[0u8; 16]; 2];
-        prg.random_block(&mut r);
+        prg.random_16byte_block(&mut r);
         let r1 = r[0];
         let r2 = r[1];
         let okvs = RbOkvs::new(n, &r1, &r2);

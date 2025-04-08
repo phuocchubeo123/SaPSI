@@ -1,9 +1,9 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate lambdaworks_math;
 
-use psiri_vole::socket_channel::TcpChannel;
-use psiri_vole::vole_triple::{VoleTriple, LPN17};
-use psiri_vole::utils::rand_field_element;
+use psi_vole::socket_channel::TcpChannel;
+use psi_vole::vole_triple::{VoleTriple, LPN17};
+use psi_vole::utils::rand_field_element;
 use std::net::{TcpListener, TcpStream};
 use std::env;
 use std::time::Instant;

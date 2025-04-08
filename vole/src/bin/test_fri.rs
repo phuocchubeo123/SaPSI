@@ -2,13 +2,13 @@ extern crate stark_platinum_prover;
 extern crate lambdaworks_math;
 extern crate lambdaworks_crypto;
 extern crate rand;
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate serde_json;
 extern crate rayon;
 
-use psiri_vole::fri::{commit_poly, verify_fri_query, query_phase, FriLayer};
-use psiri_vole::utils::{parallel_fft, parallel_ifft, get_roots_of_unity};
-use psiri_vole::fri::new_fri_layer;
+use psi_vole::fri::{commit_poly, verify_fri_query, query_phase, FriLayer};
+use psi_vole::utils::{parallel_fft, parallel_ifft, get_roots_of_unity};
+use psi_vole::fri::new_fri_layer;
 use stark_platinum_prover::transcript::StoneProverTranscript;
 use stark_platinum_prover::proof::stark::StarkProof;
 use stark_platinum_prover::fri::fri_decommit::FriDecommitment;

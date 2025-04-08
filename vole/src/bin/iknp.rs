@@ -1,9 +1,9 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate rand;
 
-use psiri_vole::iknp::IKNP;
-use psiri_vole::comm_channel::CommunicationChannel;
-use psiri_vole::socket_channel::TcpChannel;
+use psi_vole::iknp::IKNP;
+use psi_vole::comm_channel::CommunicationChannel;
+use psi_vole::socket_channel::TcpChannel;
 use std::env;
 use std::net::{TcpListener, TcpStream};
 use rand::Rng;

@@ -1,0 +1,18 @@
+[package]
+name = "psi-sa"
+version = "0.1.0"
+
+[lib]
+name = "psi_sa"
+path = "src/lib.rs"
+
+[dependencies]
+psi-network = { workspace = true }
+psi-ot = { workspace = true }
+psi-aes = { workspace = true }
+sha3 = "0.10.8"
+aes = "0.8.4"
+rand = "0.8"
+
+[[bin]]
+name = "test_cuckoo"

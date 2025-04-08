@@ -1,0 +1,13 @@
+[package]
+name = "psi-ot"
+version = "0.1.0"
+
+[lib]
+name = "psi_ot"
+path = "src/lib.rs"
+
+[dependencies]
+psi-aes = { workspace = true }
+psi-network = { workspace = true }
+p256 = { version = "0.13.2", features = ["ecdh"] }
+rand = "0.8"

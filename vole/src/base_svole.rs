@@ -1,5 +1,5 @@
 use crate::cope::Cope;
-use psiri_aes::prg::PRG;
+use psi_aes::prg::PRG;
 use crate::comm_channel::CommunicationChannel;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
@@ -68,7 +68,7 @@ impl BaseSvole {
         // Generate check seed and send it to Receiver
         let mut seed = vec![[0u8; 16]; 1];
         let mut seed_prg = PRG::new(None, 0);
-        seed_prg.random_block(&mut seed);
+        seed_prg.random_16byte_block(&mut seed);
         *comm += io.send_block::<16>(&seed).expect("Send seed for svole check failed");
 
         let chi = self.generate_hash_coeff(seed[0], size);

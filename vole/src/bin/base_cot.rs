@@ -1,9 +1,9 @@
-extern crate psiri_vole;
+extern crate psi_vole;
 
-use psiri_vole::comm_channel::CommunicationChannel;
-use psiri_vole::socket_channel::TcpChannel;
-use psiri_vole::base_cot::BaseCot;
-use psiri_vole::preot::OTPre;
+use psi_vole::comm_channel::CommunicationChannel;
+use psi_vole::socket_channel::TcpChannel;
+use psi_vole::base_cot::BaseCot;
+use psi_vole::preot::OTPre;
 use std::net::TcpStream;
 use std::env;
 use std::net::TcpListener;

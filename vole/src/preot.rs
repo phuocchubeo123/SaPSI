@@ -1,4 +1,4 @@
-use psiri_aes::hash::CCRH;
+use psi_aes::hash::CCRH;
 use crate::comm_channel::CommunicationChannel;
 
 pub struct OTPre {

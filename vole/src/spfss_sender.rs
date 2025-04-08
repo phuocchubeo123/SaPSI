@@ -1,8 +1,8 @@
 use crate::comm_channel::CommunicationChannel;
 use crate::preot::OTPre;
-use psiri_aes::two_key_prp::TwoKeyPRP;
-use psiri_aes::prg::PRG;
-use psiri_aes::hash::Hash;
+use psi_aes::two_key_prp::TwoKeyPRP;
+use psi_aes::prg::PRG;
+use psi_aes::hash::Hash;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::traits::ByteConversion;

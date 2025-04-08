@@ -1,5 +1,5 @@
 use crate::ot::OTCO;
-use psiri_aes::prg::PRG;
+use psi_aes::prg::PRG;
 use crate::comm_channel::CommunicationChannel;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
@@ -93,8 +93,8 @@ impl Cope {
 
         // Generate random keys
         let mut key_prg = PRG::new(None, 0);
-        key_prg.random_block(&mut k0);
-        key_prg.random_block(&mut k1);
+        key_prg.random_16byte_block(&mut k0);
+        key_prg.random_16byte_block(&mut k1);
 
         // Use OTCO to send keys
         let mut otco = OTCO::new();

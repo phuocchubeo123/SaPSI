@@ -1,10 +1,10 @@
-extern crate psiri_okvs;
+extern crate psi_okvs;
 extern crate lambdaworks_math;
 extern crate rand;
 
-use psiri_okvs::okvs::{RbOkvs};
-use psiri_okvs::types::{Pair, Okvs};
-use psiri_okvs::utils::rand_field_element;
+use psi_okvs::okvs::{RbOkvs};
+use psi_okvs::types::{Pair, Okvs};
+use psi_okvs::utils::rand_field_element;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use std::time::Instant;

@@ -59,7 +59,7 @@ impl PRG {
         self.counter = 0;
     }
 
-    pub fn random_block(&mut self, blocks: &mut [[u8; 16]]) {
+    pub fn random_16byte_block(&mut self, blocks: &mut [[u8; 16]]) {
         // Create an array of AES blocks for encryption
         let mut aes_blocks: Vec<_> = (0..blocks.len())
                 .map(|_| {
@@ -137,7 +137,7 @@ impl PRG {
 
     pub fn random_bool_array(&mut self, bits: &mut [bool]) {
         let mut blocks = vec![[0u8; 16]; (bits.len() + 127) / 128];
-        self.random_block(&mut blocks); // Use the AES-based random_block generator
+        self.random_16byte_block(&mut blocks); // Use the AES-based random_block generator
 
         bits.iter_mut().enumerate().for_each(|(i, bit)| {
             let block_index = i / 128;
@@ -154,7 +154,7 @@ impl PRG {
         let mut blocks = vec![[0u8; 16]; block_count];
 
         // Generate random blocks using AES
-        self.random_block(&mut blocks);
+        self.random_16byte_block(&mut blocks);
 
         // Flatten blocks into the buffer
         for (i, byte) in buffer.iter_mut().enumerate() {

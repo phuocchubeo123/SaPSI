@@ -1,4 +1,4 @@
-use psiri_aes::prp::{PRP, LubyRackoffPRP, FieldPRP};
+use psi_aes::prp::{PRP, LubyRackoffPRP, FieldPRP};
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::traits::ByteConversion;

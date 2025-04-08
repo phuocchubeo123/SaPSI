@@ -1,11 +1,11 @@
 // send and receive 100_000 32-byte blocks in <100ms
 
-extern crate psiri_vole;
+extern crate psi_vole;
 extern crate lambdaworks_math;
 extern crate rand;
 
-use psiri_vole::socket_channel::TcpChannel;
-use psiri_vole::comm_channel::CommunicationChannel;
+use psi_vole::socket_channel::TcpChannel;
+use psi_vole::comm_channel::CommunicationChannel;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::unsigned_integer::element::UnsignedInteger;

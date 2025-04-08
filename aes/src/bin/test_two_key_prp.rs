@@ -1,10 +1,10 @@
 // Running 1 million expand_1to2: 250 ms
 
-extern crate psiri_aes;
+extern crate psi_aes;
 extern crate aes;
 extern crate lambdaworks_math;
 
-use psiri_aes::two_key_prp::TwoKeyPRP;
+use psi_aes::two_key_prp::TwoKeyPRP;
 use aes::Aes256;
 use aes::cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
