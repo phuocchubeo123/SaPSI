@@ -6,4 +6,6 @@ extern crate rand;
 extern crate aes;
 
 pub mod cuckoo;
-pub mod idcf;
+pub mod idcf_sender;
+pub mod idcf_receiver;
+pub mod psi;
