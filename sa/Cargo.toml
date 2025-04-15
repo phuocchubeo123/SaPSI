@@ -15,4 +15,7 @@ aes = "0.8.4"
 rand = "0.8"
 
 [[bin]]
-name = "test_cuckoo"
+name = "cuckoo"
+
+[[bin]]
+name = "idcf"

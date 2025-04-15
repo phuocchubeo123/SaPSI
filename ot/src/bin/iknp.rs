@@ -1,9 +1,9 @@
-extern crate psi_vole;
+extern crate psi_ot;
+extern crate psi_network;
 extern crate rand;
 
-use psi_vole::iknp::IKNP;
-use psi_vole::comm_channel::CommunicationChannel;
-use psi_vole::socket_channel::TcpChannel;
+use psi_ot::iknp::IKNP;
+use psi_network::socket_channel::TcpChannel;
 use std::env;
 use std::net::{TcpListener, TcpStream};
 use rand::Rng;
@@ -24,16 +24,16 @@ fn main() {
         receiver_iknp.setup_recv(&mut io, None, None, &mut comm);
 
         const length: usize = 3000;
-        let mut data = vec![[0u8; 32]; length];
+        let mut data = vec![[0u8; 16]; length];
         let mut rng = rand::thread_rng();
         let r: [bool; length] = [(); length].map(|_| rng.gen_bool(0.5)); // Example choice bits
 
         receiver_iknp.recv_cot(&mut io, &mut data, &r, length, &mut comm);
 
-        data = vec![[0u8; 32]; length];
+        data = vec![[0u8; 16]; length];
         receiver_iknp.recv_cot(&mut io, &mut data, &r, length, &mut comm);
 
-        data = vec![[0u8; 32]; length];
+        data = vec![[0u8; 16]; length];
         receiver_iknp.recv_cot(&mut io, &mut data, &r, length, &mut comm);
     } else if role == "sender" {
         // Sender logic
@@ -46,13 +46,13 @@ fn main() {
         sender_iknp.setup_send(&mut io, None, None, &mut comm);
 
         let length = 3000;
-        let mut data = vec![[0u8; 32]; length];
+        let mut data = vec![[0u8; 16]; length];
         sender_iknp.send_cot(&mut io, &mut data, length, &mut comm);
 
-        data = vec![[0u8; 32]; length];
+        data = vec![[0u8; 16]; length];
         sender_iknp.send_cot(&mut io, &mut data, length, &mut comm);
 
-        data = vec![[0u8; 32]; length];
+        data = vec![[0u8; 16]; length];
         sender_iknp.send_cot(&mut io, &mut data, length, &mut comm);
     } else {
         panic!("Invalid role specified. Please specify 'sender' or 'receiver'.");

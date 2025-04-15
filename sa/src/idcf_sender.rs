@@ -23,7 +23,7 @@ pub struct IDCFSender {
 
 impl IDCFSender {
     pub fn new(depth: usize) -> Self {
-        let ggm_tree_size = 1 << depth;
+        let ggm_tree_size = 1 << (depth + 1);
         let mut prg = PRG::new(None, 0);
         let mut seed = [[0u8; 16]; 1];
         prg.random_16byte_block(&mut seed);
@@ -31,10 +31,10 @@ impl IDCFSender {
             seed: seed[0],
             beta: [0u8; NUM_BYTES],
             base_ggm_tree: vec![[0u8; NUM_BYTES]; ggm_tree_size],
-            implementation_values: vec![[0u8; NUM_BYTES]; ggm_tree_size * 2],
+            implementation_values: vec![[0u8; NUM_BYTES]; ggm_tree_size],
             depth: depth,
-            m0: vec![[0u8; 48]; depth],
-            m1: vec![[0u8; 48]; depth],
+            m0: vec![[0u8; 48]; depth + 1],
+            m1: vec![[0u8; 48]; depth + 1],
         }
     }
 
@@ -54,7 +54,7 @@ impl IDCFSender {
             .map(|x| convert_u8_to_u128(x))
             .collect::<Vec<[u128; 3]>>();
 
-        ot.send(io, &ot_msg_0, &ot_msg_1, self.depth - 1, s, comm);
+        ot.send(io, &ot_msg_0, &ot_msg_1, self.depth + 1, s, comm);
     }
 
     pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES]) {
@@ -76,15 +76,16 @@ impl IDCFSender {
         self.base_ggm_tree[0] = key.clone();
 
         // Every level after, expand 1-to-2
-        for h in 1..self.depth {
+        for h in 1..self.depth + 1 {
             // Assign base GGM tree values and implementation tree values
             let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
+            println!("Length of left_blocks: {}", left_blocks.len());
             g0.encrypt_blocks(&mut left_blocks);
-            for i in 0..(1 << h) {
-                self.base_ggm_tree[((1 << h) - 1) + i].copy_from_slice(&left_blocks[i]);
+            for i in 0..(1 << (h - 1)) {
+                self.base_ggm_tree[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
             }
 
             let mut right_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
@@ -92,8 +93,8 @@ impl IDCFSender {
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             g1.encrypt_blocks(&mut right_blocks);
-            for i in 0..(1 << h) {
-                self.base_ggm_tree[((1 << h) - 1) + i].copy_from_slice(&right_blocks[i]);
+            for i in 0..(1 << (h - 1)) {
+                self.base_ggm_tree[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
             }
 
             let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
@@ -101,8 +102,8 @@ impl IDCFSender {
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             c0.encrypt_blocks(&mut left_blocks);
-            for i in 0..(1 << h) {
-                self.implementation_values[((1 << h) - 1) + i].copy_from_slice(&left_blocks[i]);
+            for i in 0..(1 << (h - 1)) {
+                self.implementation_values[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
             }
 
             let mut right_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
@@ -110,8 +111,8 @@ impl IDCFSender {
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             c1.encrypt_blocks(&mut right_blocks);
-            for i in 0..(1 << h) {
-                self.implementation_values[((1 << h) - 1) + i].copy_from_slice(&right_blocks[i]);
+            for i in 0..(1 << (h - 1)) {
+                self.implementation_values[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
             }
 
             // Compute the left-right sums
@@ -123,6 +124,14 @@ impl IDCFSender {
             self.implementation_values[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().for_each(|x| xor_block(&mut left_impl, x));
             let mut right_impl = [0u8; NUM_BYTES];
             self.implementation_values[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().for_each(|x| xor_block(&mut right_impl, x));
+
+            println!("Left base: {:?}", left_base);
+            println!("Right base: {:?}", right_base);
+            println!("Current layer base tree:");
+            for i in 0..(1 << h) {
+                println!("{:?}", self.base_ggm_tree[(1 << h) - 1 + i]);
+            }
+
 
             // Compute the OT messages
             self.m0[h][0..16].copy_from_slice(&right_base);
@@ -141,6 +150,15 @@ impl IDCFSender {
                 xor_block(&mut left_impl, &self.beta);
                 self.m1[h][16..32].copy_from_slice(&left_impl);
                 self.m1[h][32..48].copy_from_slice(&right_impl);
+            }
+        }
+
+        idcf_sharing[1] = self.implementation_values[1];
+        idcf_sharing[2] = self.implementation_values[2];
+        for h in 2..self.depth + 1 {
+            for x in 0..(1 << h) {
+                idcf_sharing[(1 << h) - 1 + x as usize] = idcf_sharing[(1 << (h - 1)) - 1 + (x >> 1) as usize];
+                xor_block(&mut idcf_sharing[(1 << h) - 1 + x as usize], &self.implementation_values[(1 << h) - 1 + x as usize]);
             }
         }
     }

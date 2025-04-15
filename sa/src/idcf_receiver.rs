@@ -10,41 +10,41 @@ pub struct IDCFReceiver {
     depth: usize,
     alpha: Vec<bool>,
     base_ggm_tree: Vec<[u8; NUM_BYTES]>,
-    implementation_tree: Vec<[u8; NUM_BYTES]>,
+    implementation_values: Vec<[u8; NUM_BYTES]>,
     m: Vec<[u8; OT_NUM_BYTES]>,
 }
 
 impl IDCFReceiver {
-    pub fn new(depth: usize, alpha: &[bool]) -> Self {
-        assert_eq!(alpha.len(), depth);
-        let ggm_tree_size = (1 << (depth + 1)) - 1;
+    pub fn new(depth: usize) -> Self {
+        let ggm_tree_size = 1 << (depth + 1);
         IDCFReceiver {
             depth,
-            alpha: alpha.to_vec(),
+            alpha: vec![false; depth + 1],
             base_ggm_tree: vec![[0u8; 16]; ggm_tree_size],
-            implementation_tree: vec![[0u8; 16]; ggm_tree_size],
-            m: vec![[0u8; 48]; depth],
+            implementation_values: vec![[0u8; 16]; ggm_tree_size],
+            m: vec![[0u8; 48]; depth + 1],
         }
     }
 
     // Here, alpha only has depth number of bits
-    pub fn receive<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<3>, s: usize, comm: &mut u64) {
-        let mut ot_msg = vec![[0u128; 3]; self.depth];
-        ot.recv(io, &mut ot_msg, &self.alpha, self.depth, s, comm);
-        for h in 0..self.depth {
+    pub fn receive<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<3>, alpha: [u8; 16], s: usize, comm: &mut u64) {
+        // We always assume that alpha here will not have more than 128 bits
+        for i in 0..self.depth {
+            self.alpha[i + 1] = ((alpha[i / 8] >> (i % 8)) & 1) == 1;
+        }
+
+        let mut ot_msg = vec![[0u128; 3]; self.depth + 1];
+        ot.recv(io, &mut ot_msg, &self.alpha, self.depth + 1, s, comm);
+        for h in 0..self.depth + 1 {
             self.m[h] = convert_u128_to_u8(&ot_msg[h]);
         }
     }
 
-    pub fn compute(&mut self, base_ggm_tree_mem: &mut [[u8; 16]], implementation_tree_mem: &mut [[u8; 16]], alpha: [u8; 16]) {
-        // We always assume that alpha here will not have more than 128 bits
-        for i in 0..self.depth {
-            self.alpha[i] = ((alpha[i / 8] >> (i % 8)) & 1) == 1;
-        }
-        self.idcf_reconstruct(base_ggm_tree_mem, implementation_tree_mem);
+    pub fn compute(&mut self, idcf_sharing: &mut [[u8; 16]]) {
+        self.idcf_reconstruct(idcf_sharing);
     }
 
-    pub fn idcf_reconstruct(&mut self, base_ggm_tree_mem: &mut[[u8; 16]], implementation_tree_mem: &mut [[u8; 16]]) {
+    pub fn idcf_reconstruct(&mut self, idcf_sharing: &mut [[u8; 16]]) {
         // Here, we assume fixed key AES to be Random Oracle
         let mut kg0 = [0u8; 16];
         let mut kg1 = [0u8; 16];
@@ -61,10 +61,48 @@ impl IDCFReceiver {
 
         let mut missing_pos: usize = 0;
         let mut fill_pos: usize = 0;
-        for h in 1..self.depth {
+        for h in 1..self.depth + 1 {
             // Fill a_1 ... \bar{a_h} and fill next layer nodes
             missing_pos = (missing_pos << 1) | (self.alpha[h] as usize);
             fill_pos = missing_pos ^ 1;
+            // Assign base GGM tree values and implementation tree values for the non-missing layer nodes
+            let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+                .iter()
+                .map(|x| GenericArray::clone_from_slice(x))
+                .collect();
+            g0.encrypt_blocks(&mut left_blocks);
+            for i in 0..(1 << (h - 1)) {
+                self.base_ggm_tree[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
+            }
+
+            let mut right_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+                .iter()
+                .map(|x| GenericArray::clone_from_slice(x))
+                .collect();
+            g1.encrypt_blocks(&mut right_blocks);
+            for i in 0..(1 << (h - 1)) {
+                self.base_ggm_tree[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
+            }
+
+            let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+                .iter()
+                .map(|x| GenericArray::clone_from_slice(x))
+                .collect();
+            c0.encrypt_blocks(&mut left_blocks);
+            for i in 0..(1 << (h - 1)) {
+                self.implementation_values[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
+            }
+
+            let mut right_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+                .iter()
+                .map(|x| GenericArray::clone_from_slice(x))
+                .collect();
+            c1.encrypt_blocks(&mut right_blocks);
+            for i in 0..(1 << (h - 1)) {
+                self.implementation_values[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
+            }
+
+            // Fill in the non-critical-path hole in this layer
             self.base_ggm_tree[(1 << h) - 1 + fill_pos].copy_from_slice(&self.m[h][0..16]);
             for i in 0..(1 << (h - 1)) {
                 let pos: usize = (1 << h) - 1 + (((i << 1) | (self.alpha[h] as usize)) ^ 1);
@@ -74,65 +112,41 @@ impl IDCFReceiver {
                 }
             }
 
-            // Assign base GGM tree values and implementation tree values for the non-missing next layer nodes
-            let mut left_blocks: Vec<_> = base_ggm_tree_mem[((1 << (h-1)) - 1)..((1 << h) - 1)]
-                .iter()
-                .map(|x| GenericArray::clone_from_slice(x))
-                .collect();
-            g0.encrypt_blocks(&mut left_blocks);
+            println!("Received sum of base values:");
+            println!("{:?}", &self.m[h][0..16]);
+            println!("Current layer base tree:");
             for i in 0..(1 << h) {
-                base_ggm_tree_mem[((1 << h) - 1) + i].copy_from_slice(&left_blocks[i]);
-            }
-
-            let mut right_blocks: Vec<_> = base_ggm_tree_mem[((1 << (h-1)) - 1)..((1 << h) - 1)]
-                .iter()
-                .map(|x| GenericArray::clone_from_slice(x))
-                .collect();
-            g1.encrypt_blocks(&mut right_blocks);
-            for i in 0..(1 << h) {
-                base_ggm_tree_mem[((1 << h) - 1) + i].copy_from_slice(&right_blocks[i]);
-            }
-
-            let mut left_blocks: Vec<_> = base_ggm_tree_mem[((1 << (h-1)) - 1)..((1 << h) - 1)]
-                .iter()
-                .map(|x| GenericArray::clone_from_slice(x))
-                .collect();
-            c0.encrypt_blocks(&mut left_blocks);
-            for i in 0..(1 << h) {
-                implementation_tree_mem[((1 << h) - 1) + i].copy_from_slice(&left_blocks[i]);
-            }
-
-            let mut right_blocks: Vec<_> = base_ggm_tree_mem[((1 << (h-1)) - 1)..((1 << h) - 1)]
-                .iter()
-                .map(|x| GenericArray::clone_from_slice(x))
-                .collect();
-            c1.encrypt_blocks(&mut right_blocks);
-            for i in 0..(1 << h) {
-                implementation_tree_mem[((1 << h) - 1) + i].copy_from_slice(&right_blocks[i]);
+                println!("{:?}", self.base_ggm_tree[(1 << h) - 1 + i]);
             }
 
             // Now fill in the hole in the implementation tree
-            self.implementation_tree[(1 << h) - 1 + (missing_pos & 0)].copy_from_slice(&self.m[h][16..32]);
+            self.implementation_values[(1 << h) - 1 + (missing_pos & 0)].copy_from_slice(&self.m[h][16..32]);
             for i in 0..(1 << (h - 1)) {
                 let pos: usize = (1 << h) - 1 + (i << 1);
-                let val: [u8; 16] = self.implementation_tree[pos];
+                let val: [u8; 16] = self.implementation_values[pos];
                 if pos != (1 << h) - 1 + (missing_pos & 0) {
-                    xor_block(&mut self.implementation_tree[missing_pos], &val);
+                    xor_block(&mut self.implementation_values[missing_pos], &val);
                 }
             }
 
-            self.implementation_tree[(1 << h) - 1 + (missing_pos & 1)].copy_from_slice(&self.m[h][32..48]);
+            self.implementation_values[(1 << h) - 1 + (missing_pos & 1)].copy_from_slice(&self.m[h][32..48]);
             for i in 0..(1 << (h - 1)) {
                 let pos: usize = (1 << h) - 1 + ((i << 1) ^ 1);
-                let val: [u8; 16] = self.implementation_tree[pos];
+                let val: [u8; 16] = self.implementation_values[pos];
                 if pos != (1 << h) - 1 + (missing_pos & 1) {
-                    xor_block(&mut self.implementation_tree[missing_pos], &val);
+                    xor_block(&mut self.implementation_values[missing_pos], &val);
                 }
             }
         }
 
-        base_ggm_tree_mem.copy_from_slice(&self.base_ggm_tree);
-        implementation_tree_mem.copy_from_slice(&self.implementation_tree);
+        idcf_sharing[1] = self.implementation_values[1];
+        idcf_sharing[2] = self.implementation_values[2];
+        for h in 2..self.depth + 1 {
+            for x in 0..(1 << h) {
+                idcf_sharing[(1 << h) - 1 + x as usize] = idcf_sharing[(1 << (h - 1)) - 1 + (x >> 1) as usize];
+                xor_block(&mut idcf_sharing[(1 << h) - 1 + x as usize], &self.implementation_values[(1 << h) - 1 + x as usize]);
+            }
+        }
     }
 
     pub fn consistency_check<IO: CommunicationChannel>(&self, io: & mut IO, idcf_sharing: &[[u8; NUM_BYTES]]) {

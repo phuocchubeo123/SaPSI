@@ -50,7 +50,7 @@ impl BaseCot {
                 prg.random_16byte_block(&mut tmp);
                 let mut delta = tmp[0];
                 delta = bitwise_and(&delta, &self.minus_one);
-                delta = bitwise_xor(&delta, &self.one);
+                delta = bitwise_xor(&delta, &self.one); // To make sure delta has the last bit equals to 1
                 self.ot_delta = Some(delta);
                 let delta_bool = block_to_bool(&delta);
                 self.iknp.setup_send(io, Some(&delta_bool), None, comm);

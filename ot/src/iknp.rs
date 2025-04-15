@@ -338,7 +338,7 @@ impl IKNP {
         xor_blocks(&mut t, &tmp);
 
         for j in 0..(NUM_BITS * 2) {
-            for byt in 0..32 {
+            for byt in 0..16 {
                 x[byt] = x[byt] ^ (chi[j][byt] & select[self.local_r[j] as usize][byt]);
             }
         }

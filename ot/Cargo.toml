@@ -11,3 +11,9 @@ psi-aes = { workspace = true }
 psi-network = { workspace = true }
 p256 = { version = "0.13.2", features = ["ecdh"] }
 rand = "0.8"
+
+[[bin]]
+name = "base_cot"
+
+[[bin]]
+name = "iknp"

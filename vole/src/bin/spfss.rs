@@ -79,7 +79,6 @@ fn main() {
             // receiver_spfss.consistency_check(&mut channel, delta2, beta);
         }
     } else if role == "sender" {
-        // Sender logic
         // Connect to the receiver
         let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);

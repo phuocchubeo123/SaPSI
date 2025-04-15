@@ -46,13 +46,7 @@ name = "sender_tcp"
 name = "base_svole"
 
 [[bin]]
-name = "iknp"
-
-[[bin]]
 name = "test_mul"
-
-[[bin]]
-name = "base_cot"
 
 [[bin]]
 name = "spfss"
