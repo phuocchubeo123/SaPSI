@@ -1,5 +1,6 @@
 extern crate psi_ot;
 extern crate psi_network;
+extern crate rand;
 
 use psi_network::comm_channel::CommunicationChannel;
 use psi_network::socket_channel::TcpChannel;
@@ -9,6 +10,7 @@ use std::net::TcpStream;
 use std::env;
 use std::net::TcpListener;
 use std::time::Instant;
+use rand::random;
 
 fn main() {
     // Get the role argument (sender or receiver)
@@ -33,21 +35,25 @@ fn main() {
         let times = 100;
         let mut original_ot_data = vec![[0u8; 32]; size];
         let mut choice_bits = vec![false; size];
+        for bit in &mut choice_bits {
+            *bit = rand::random();
+        }
 
         let mut receiver_pre_ot = OTPre::<2>::new(size, times);
         receiver_cot.cot_gen_preot(&mut channel, &mut receiver_pre_ot, size * times, None, &mut comm);
 
         let start = Instant::now();
         for s in 0..times {
-            receiver_pre_ot.choices_recver(&choice_bits);
+            receiver_pre_ot.choices_recver(&mut channel, &choice_bits, &mut comm);
         }
         channel.flush();
         receiver_pre_ot.reset();
         // Receive data using OTPre
         for s in 0..times {
+            let idx = (s * 37) % size;
             let mut received_data = vec![[0u128; 2]; size];
             receiver_pre_ot.recv(&mut channel, &mut received_data, &choice_bits, size, s, &mut comm);
-            println!("Received data for iteration {}: {:?}", s, received_data[0]);
+            println!("Received data for iteration with choice bit {}: {:?}", choice_bits[idx], received_data[idx]);
         }
         let duration = start.elapsed();
         println!("Time taken: {:?}", duration);
@@ -70,7 +76,7 @@ fn main() {
         let mut sender_pre_ot = OTPre::<2>::new(size, times);
         sender_cot.cot_gen_preot(&mut channel, &mut sender_pre_ot, size*times, None, &mut comm);
         for s in 0..times {
-            sender_pre_ot.choices_sender();
+            sender_pre_ot.choices_sender(&mut channel, &mut comm);
         }
         channel.flush();
         sender_pre_ot.reset();
@@ -80,8 +86,8 @@ fn main() {
             let mut m0 = vec![[0u128; 2]; size];
             let mut m1 = vec![[0u128; 2]; size];
             for i in 0..size {
-                m0[i] = [i as u128; 2];
-                m1[i] = [(i + 1) as u128; 2];
+                m0[i] = [s as u128; 2];
+                m1[i] = [(s + 1) as u128; 2];
             }
             sender_pre_ot.send(&mut channel, &m0, &m1, size, s, &mut comm);
         }

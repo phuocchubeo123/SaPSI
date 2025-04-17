@@ -50,6 +50,12 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
                 self.pre_data[i][j] = u128::from_le_bytes(hashed_data[j][i]);
             }
         }
+
+        for i in 0..10 {
+            println!("This OT:");
+            println!("{:?}", self.pre_data[i]);
+            println!("{:?}", self.pre_data[i + self.n]);
+        }
     }
 
     // Take COT messages already prepared and turn them into random keys for lengthening OT later
@@ -77,14 +83,29 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
                 self.pre_data[i][j] = u128::from_le_bytes(hashed_data[j][i]);
             }
         }
+
+        for i in 0..10 {
+            println!("bit: {}", self.bits[i]);
+            println!("{:?}", self.pre_data[i]);
+        }
     }
 
-    pub fn choices_sender(&mut self) {
+    // Spend one more round to send the choice bits
+    pub fn choices_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, comm: &mut u64) {
+        let received_bits = io.receive_bits().expect("Failed to receive bits");
+        for (i, &bit) in received_bits.iter().enumerate() {
+            self.bits[self.count + i] = bit;
+        }
         self.count += self.length;
     }
 
-    pub fn choices_recver(&mut self, choices: &[bool]) {
-        self.bits[self.count..self.count + self.length].copy_from_slice(choices);
+    pub fn choices_recver<IO: CommunicationChannel>(&mut self, io: &mut IO, choices: &[bool], comm: &mut u64) {
+        let mut adjusted_bits = vec![false; self.length];
+        for i in 0..self.length {
+            adjusted_bits[i] = choices[i] ^ self.bits[self.count + i];
+            self.bits[self.count+i] = adjusted_bits[i].clone();
+        }
+        *comm += io.send_bits(&adjusted_bits).expect("Failed to send bits");
         self.count += self.length;
     }
 
