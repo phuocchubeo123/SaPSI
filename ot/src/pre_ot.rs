@@ -51,11 +51,11 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
             }
         }
 
-        for i in 0..10 {
-            println!("This OT:");
-            println!("{:?}", self.pre_data[i]);
-            println!("{:?}", self.pre_data[i + self.n]);
-        }
+        // for i in 0..10 {
+        //     println!("This OT:");
+        //     println!("{:?}", self.pre_data[i]);
+        //     println!("{:?}", self.pre_data[i + self.n]);
+        // }
     }
 
     // Take COT messages already prepared and turn them into random keys for lengthening OT later
@@ -84,10 +84,10 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
             }
         }
 
-        for i in 0..10 {
-            println!("bit: {}", self.bits[i]);
-            println!("{:?}", self.pre_data[i]);
-        }
+        // for i in 0..10 {
+        //     println!("bit: {}", self.bits[i]);
+        //     println!("{:?}", self.pre_data[i]);
+        // }
     }
 
     // Spend one more round to send the choice bits

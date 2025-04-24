@@ -26,7 +26,7 @@ fn main() {
     let mut cuckoo = CuckooHash::new(table_size, max_probe);
     cuckoo.generate_loc_funcs(loc_func_count, None);
     for item in items.iter() {
-        let res: bool = cuckoo.insert(item);
+        let res: bool = cuckoo.insert(item, &[0u128; NUM_LIMBS]);
         println!("Insertion result: {}", res);
     }
 

@@ -33,10 +33,18 @@ impl IDCFReceiver {
             self.alpha[i + 1] = ((alpha[i / 8] >> (i % 8)) & 1) == 1;
         }
 
+        println!("Alpha bits: {:?}", &self.alpha[0..self.depth + 1]);
+
+        ot.choices_recver(io, &self.alpha, comm);
+
         let mut ot_msg = vec![[0u128; 3]; self.depth + 1];
         ot.recv(io, &mut ot_msg, &self.alpha, self.depth + 1, s, comm);
         for h in 0..self.depth + 1 {
             self.m[h] = convert_u128_to_u8(&ot_msg[h]);
+        }
+
+        for i in 0..(self.depth + 1) {
+            println!("Received sum of base values: {:?}", ot_msg[i]);
         }
     }
 
@@ -65,6 +73,8 @@ impl IDCFReceiver {
             // Fill a_1 ... \bar{a_h} and fill next layer nodes
             missing_pos = (missing_pos << 1) | (self.alpha[h] as usize);
             fill_pos = missing_pos ^ 1;
+            println!("Missing position: {}", missing_pos);
+            println!("Fill position: {}", fill_pos);
             // Assign base GGM tree values and implementation tree values for the non-missing layer nodes
             let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
@@ -102,41 +112,47 @@ impl IDCFReceiver {
                 self.implementation_values[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
             }
 
+            println!("Current layer implementation values:");
+            for i in 0..(1 << h) {
+                println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            }
+
+
             // Fill in the non-critical-path hole in this layer
             self.base_ggm_tree[(1 << h) - 1 + fill_pos].copy_from_slice(&self.m[h][0..16]);
             for i in 0..(1 << (h - 1)) {
                 let pos: usize = (1 << h) - 1 + (((i << 1) | (self.alpha[h] as usize)) ^ 1);
                 let val: [u8; 16] = self.base_ggm_tree[pos];
                 if  pos != (1 << h) - 1 + fill_pos {
-                    xor_block(&mut self.base_ggm_tree[fill_pos], &val);
+                    xor_block(&mut self.base_ggm_tree[(1 << h) - 1 + fill_pos], &val);
                 }
-            }
-
-            println!("Received sum of base values:");
-            println!("{:?}", &self.m[h][0..16]);
-            println!("Current layer base tree:");
-            for i in 0..(1 << h) {
-                println!("{:?}", self.base_ggm_tree[(1 << h) - 1 + i]);
             }
 
             // Now fill in the hole in the implementation tree
-            self.implementation_values[(1 << h) - 1 + (missing_pos & 0)].copy_from_slice(&self.m[h][16..32]);
+            self.implementation_values[(1 << h) - 1 + ((missing_pos | 1) ^ 1)].copy_from_slice(&self.m[h][16..32]);
             for i in 0..(1 << (h - 1)) {
                 let pos: usize = (1 << h) - 1 + (i << 1);
                 let val: [u8; 16] = self.implementation_values[pos];
-                if pos != (1 << h) - 1 + (missing_pos & 0) {
-                    xor_block(&mut self.implementation_values[missing_pos], &val);
+                if pos != (1 << h) - 1 + ((missing_pos | 1) ^ 1) {
+                    xor_block(&mut self.implementation_values[(1 << h) - 1 + ((missing_pos | 1) ^ 1)], &val);
                 }
             }
 
-            self.implementation_values[(1 << h) - 1 + (missing_pos & 1)].copy_from_slice(&self.m[h][32..48]);
+            self.implementation_values[(1 << h) - 1 + (missing_pos | 1)].copy_from_slice(&self.m[h][32..48]);
             for i in 0..(1 << (h - 1)) {
                 let pos: usize = (1 << h) - 1 + ((i << 1) ^ 1);
                 let val: [u8; 16] = self.implementation_values[pos];
-                if pos != (1 << h) - 1 + (missing_pos & 1) {
-                    xor_block(&mut self.implementation_values[missing_pos], &val);
+                if pos != (1 << h) - 1 + (missing_pos | 1) {
+                    xor_block(&mut self.implementation_values[(1 << h) - 1 + (missing_pos | 1)], &val);
                 }
             }
+
+            println!("Current layer implementation values after filling:");
+            for i in 0..(1 << h) {
+                println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            }
+
+
         }
 
         idcf_sharing[1] = self.implementation_values[1];
@@ -160,10 +176,15 @@ impl IDCFReceiver {
                 if x < alpha_pref {
                     let mut shared_value = idcf_sharing[(1 << h) - 1 + x as usize];
                     xor_block(&mut shared_value, &sender_idcf_sharing[(1 << h) - 1 + x as usize]);
+                    assert_eq!(shared_value.to_vec(), vec![0u8; 16], "IDCF sharing mismatch at depth {} and index {}", h, x);
+                } else {
+                    let mut shared_value = idcf_sharing[(1 << h) - 1 + x as usize];
+                    xor_block(&mut shared_value, &sender_idcf_sharing[(1 << h) - 1 + x as usize]);
                     assert_eq!(shared_value.to_vec(), beta, "IDCF sharing mismatch at depth {} and index {}", h, x);
                 }
             }
         }
+        println!("IDCF sharing consistency check passed");
     }
 }
 

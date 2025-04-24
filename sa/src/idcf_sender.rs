@@ -4,6 +4,7 @@ use psi_network::comm_channel::CommunicationChannel;
 use psi_ot::pre_ot::OTPre;
 use psi_aes::prg::PRG;
 use std::convert::TryInto;
+use std::f32::consts::E;
 
 const NUM_BYTES: usize = 16;
 const OT_NUM_BYTES: usize = NUM_BYTES * 3;
@@ -45,6 +46,7 @@ impl IDCFSender {
 
     /// Send OT messages and secret sum.
     pub fn send<IO: CommunicationChannel>(&self, io: &mut IO, ot: &mut OTPre<3>, s: usize, comm: &mut u64) {
+        ot.choices_sender(io, comm);
         let ot_msg_0 = self.m0
             .iter()
             .map(|x| convert_u8_to_u128(x))
@@ -55,6 +57,12 @@ impl IDCFSender {
             .collect::<Vec<[u128; 3]>>();
 
         ot.send(io, &ot_msg_0, &ot_msg_1, self.depth + 1, s, comm);
+
+        for h in 0..(self.depth + 1) {
+            println!("This OT:");
+            println!("Sender sent sum of base values for alpha = 0: {:?}", ot_msg_0[h]);
+            println!("Sender sent sum of base values for alpha = 1: {:?}", ot_msg_1[h]);
+        }
     }
 
     pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES]) {
@@ -117,21 +125,30 @@ impl IDCFSender {
 
             // Compute the left-right sums
             let mut left_base = [0u8; NUM_BYTES];
-            self.base_ggm_tree[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().for_each(|x| xor_block(&mut left_base, x));
             let mut right_base = [0u8; NUM_BYTES];
-            self.base_ggm_tree[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().for_each(|x| xor_block(&mut right_base, x));
+            self.base_ggm_tree[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().enumerate().for_each(|(i, x)| {
+                if i & 1 == 1 {
+                    xor_block(&mut right_base, x);
+                } else {
+                    xor_block(&mut left_base, x);
+                }
+            });
             let mut left_impl = [0u8; NUM_BYTES];
-            self.implementation_values[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().for_each(|x| xor_block(&mut left_impl, x));
             let mut right_impl = [0u8; NUM_BYTES];
-            self.implementation_values[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().for_each(|x| xor_block(&mut right_impl, x));
+            self.implementation_values[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().enumerate().for_each(|(i, x)| {
+                if i & 1 == 1 {
+                    xor_block(&mut right_impl, x);
+                } else {
+                    xor_block(&mut left_impl, x);
+                }
+            });
 
-            println!("Left base: {:?}", left_base);
-            println!("Right base: {:?}", right_base);
-            println!("Current layer base tree:");
+            println!("Left impl: {:?}", left_impl);
+            println!("Right impl: {:?}", right_impl);
+            println!("Current layer implementation values:");
             for i in 0..(1 << h) {
-                println!("{:?}", self.base_ggm_tree[(1 << h) - 1 + i]);
+                println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
             }
-
 
             // Compute the OT messages
             self.m0[h][0..16].copy_from_slice(&right_base);
@@ -166,7 +183,7 @@ impl IDCFSender {
     // Only for debug
     pub fn consistency_check<IO: CommunicationChannel>(&self, io: &mut IO, idcf_sharing: &[[u8; NUM_BYTES]]) {
         io.send_u8(&self.beta).expect("Failed to send beta for testing");
-        io.send_block::<NUM_BYTES>(&self.base_ggm_tree).unwrap();
+        io.send_block::<NUM_BYTES>(idcf_sharing).unwrap();
     }
 }
 

@@ -8,4 +8,5 @@ extern crate aes;
 pub mod cuckoo;
 pub mod idcf_sender;
 pub mod idcf_receiver;
-pub mod psi;
+pub mod psi_sender;
+pub mod psi_receiver;

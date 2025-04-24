@@ -78,7 +78,7 @@ fn main() {
         rng_seed.fill(&mut key);
         let mut idcf_sender = IDCFSender::new(depth);
 
-        idcf_sender.compute(&mut idcf_sharing, beta, [0u8; 16]);
+        idcf_sender.compute(&mut idcf_sharing, key, beta);
         idcf_sender.send(&mut channel, &mut sender_pre_ot, 0, &mut comm);
 
         idcf_sender.consistency_check(&mut channel, &idcf_sharing);
