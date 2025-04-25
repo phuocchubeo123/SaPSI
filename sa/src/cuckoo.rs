@@ -88,6 +88,7 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
         let locations = self.all_locations(item);
         for location in locations.iter() {
             if self.table[*location].0 == *item {
+                println!("Item found in the table at location {}", location);
                 return true;
             }
         }
@@ -97,6 +98,7 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
 
     pub fn insert(&mut self, key: &[u128; NUM_LIMBS], value: &[u128; NUM_LIMBS]) -> bool {
         if self.query(key) {
+            println!("Item already exists in the table");
             return false;
         }
 
@@ -231,5 +233,9 @@ impl<const NUM_LIMBS: usize> SimpleHash<NUM_LIMBS> {
                 self.table[i].push(([0u128; NUM_LIMBS], [0u128; NUM_LIMBS]));
             }
         }
+    }
+
+    pub fn query_table(&self, index: usize) -> Vec<([u128; NUM_LIMBS], [u128; NUM_LIMBS])> {
+        self.table[index].clone()
     }
 }

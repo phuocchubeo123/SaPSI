@@ -58,11 +58,11 @@ impl IDCFSender {
 
         ot.send(io, &ot_msg_0, &ot_msg_1, self.depth + 1, s, comm);
 
-        for h in 0..(self.depth + 1) {
-            println!("This OT:");
-            println!("Sender sent sum of base values for alpha = 0: {:?}", ot_msg_0[h]);
-            println!("Sender sent sum of base values for alpha = 1: {:?}", ot_msg_1[h]);
-        }
+        // for h in 0..(self.depth + 1) {
+        //     println!("This OT:");
+        //     println!("Sender sent sum of base values for alpha = 0: {:?}", ot_msg_0[h]);
+        //     println!("Sender sent sum of base values for alpha = 1: {:?}", ot_msg_1[h]);
+        // }
     }
 
     pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES]) {
@@ -90,7 +90,7 @@ impl IDCFSender {
                 .iter()
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
-            println!("Length of left_blocks: {}", left_blocks.len());
+            // println!("Length of left_blocks: {}", left_blocks.len());
             g0.encrypt_blocks(&mut left_blocks);
             for i in 0..(1 << (h - 1)) {
                 self.base_ggm_tree[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
@@ -143,12 +143,12 @@ impl IDCFSender {
                 }
             });
 
-            println!("Left impl: {:?}", left_impl);
-            println!("Right impl: {:?}", right_impl);
-            println!("Current layer implementation values:");
-            for i in 0..(1 << h) {
-                println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
-            }
+            // println!("Left impl: {:?}", left_impl);
+            // println!("Right impl: {:?}", right_impl);
+            // println!("Current layer implementation values:");
+            // for i in 0..(1 << h) {
+            //     println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            // }
 
             // Compute the OT messages
             self.m0[h][0..16].copy_from_slice(&right_base);

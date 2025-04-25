@@ -33,7 +33,7 @@ impl IDCFReceiver {
             self.alpha[i + 1] = ((alpha[i / 8] >> (i % 8)) & 1) == 1;
         }
 
-        println!("Alpha bits: {:?}", &self.alpha[0..self.depth + 1]);
+        // println!("Alpha bits: {:?}", &self.alpha[0..self.depth + 1]);
 
         ot.choices_recver(io, &self.alpha, comm);
 
@@ -43,9 +43,9 @@ impl IDCFReceiver {
             self.m[h] = convert_u128_to_u8(&ot_msg[h]);
         }
 
-        for i in 0..(self.depth + 1) {
-            println!("Received sum of base values: {:?}", ot_msg[i]);
-        }
+        // for i in 0..(self.depth + 1) {
+        //     println!("Received sum of base values: {:?}", ot_msg[i]);
+        // }
     }
 
     pub fn compute(&mut self, idcf_sharing: &mut [[u8; 16]]) {
@@ -73,8 +73,8 @@ impl IDCFReceiver {
             // Fill a_1 ... \bar{a_h} and fill next layer nodes
             missing_pos = (missing_pos << 1) | (self.alpha[h] as usize);
             fill_pos = missing_pos ^ 1;
-            println!("Missing position: {}", missing_pos);
-            println!("Fill position: {}", fill_pos);
+            // println!("Missing position: {}", missing_pos);
+            // println!("Fill position: {}", fill_pos);
             // Assign base GGM tree values and implementation tree values for the non-missing layer nodes
             let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
@@ -112,10 +112,10 @@ impl IDCFReceiver {
                 self.implementation_values[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
             }
 
-            println!("Current layer implementation values:");
-            for i in 0..(1 << h) {
-                println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
-            }
+            // println!("Current layer implementation values:");
+            // for i in 0..(1 << h) {
+            //     println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            // }
 
 
             // Fill in the non-critical-path hole in this layer
@@ -147,10 +147,10 @@ impl IDCFReceiver {
                 }
             }
 
-            println!("Current layer implementation values after filling:");
-            for i in 0..(1 << h) {
-                println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
-            }
+            // println!("Current layer implementation values after filling:");
+            // for i in 0..(1 << h) {
+            //     println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            // }
 
 
         }

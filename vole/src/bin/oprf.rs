@@ -120,8 +120,8 @@ fn main() {
             .expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
 
-        let seed = channel.receive_block::<16>().expect("Failed to receive seed from receiver");
-        let mut rng = ChaCha12Rng::from_seed(Default::default());
+        let seed = channel.receive_block::<32>().expect("Failed to receive seed from receiver");
+        let mut rng = ChaCha12Rng::from_seed(seed[0]);
         let data = (0..size).map(|_| gen_input(&mut rng)).collect::<Vec<FE>>();
 
         println!("Started PSI");
@@ -145,13 +145,13 @@ fn main() {
         let mut channel = TcpChannel::new(stream);
 
         // Send data to Sender for test
-        let mut seed = [0u8; 16];
+        let mut seed = [0u8; 32];
         let mut rng_seed = rand::thread_rng();
         rng_seed.fill(&mut seed);
-        let mut rng = ChaCha12Rng::from_seed(Default::default());
+        let mut rng = ChaCha12Rng::from_seed(seed);
         let data = (0..size).map(|_| gen_input(&mut rng)).collect::<Vec<FE>>();
 
-        channel.send_block::<16>(&[seed]).expect("Failed to send seed to sender");
+        channel.send_block::<32>(&[seed]).expect("Failed to send seed to sender");
         println!("Started PSI");
 
         let start_protocol = Instant::now();
