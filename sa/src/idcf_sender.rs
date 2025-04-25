@@ -5,6 +5,7 @@ use psi_ot::pre_ot::OTPre;
 use psi_aes::prg::PRG;
 use std::convert::TryInto;
 use std::f32::consts::E;
+use std::time::Instant;
 
 const NUM_BYTES: usize = 16;
 const OT_NUM_BYTES: usize = NUM_BYTES * 3;
@@ -13,50 +14,54 @@ const OT_NUM_BYTES: usize = NUM_BYTES * 3;
 // All values are taken in GF128
 
 pub struct IDCFSender {
-    seed: [u8; NUM_BYTES],
-    beta: [u8; NUM_BYTES],
-    base_ggm_tree: Vec<[u8; NUM_BYTES]>,
-    implementation_values: Vec<[u8; NUM_BYTES]>,
+    beta: Vec<[u8; NUM_BYTES]>,
+    base_ggm_tree: Vec<Vec<[u8; NUM_BYTES]>>,
+    implementation_values: Vec<Vec<[u8; NUM_BYTES]>>,
     depth: usize,
-    m0: Vec<[u8; OT_NUM_BYTES]>,
-    m1: Vec<[u8; OT_NUM_BYTES]>,
+    m0: Vec<Vec<[u8; OT_NUM_BYTES]>>,
+    m1: Vec<Vec<[u8; OT_NUM_BYTES]>>,
+    times: usize,
 }
 
 impl IDCFSender {
-    pub fn new(depth: usize) -> Self {
+    pub fn new(depth: usize, times: usize) -> Self {
         let ggm_tree_size = 1 << (depth + 1);
         let mut prg = PRG::new(None, 0);
         let mut seed = [[0u8; 16]; 1];
         prg.random_16byte_block(&mut seed);
         Self {
-            seed: seed[0],
-            beta: [0u8; NUM_BYTES],
-            base_ggm_tree: vec![[0u8; NUM_BYTES]; ggm_tree_size],
-            implementation_values: vec![[0u8; NUM_BYTES]; ggm_tree_size],
+            beta: vec![[0u8; NUM_BYTES]; times],
+            base_ggm_tree: vec![vec![[0u8; NUM_BYTES]; ggm_tree_size]; times],
+            implementation_values: vec![vec![[0u8; NUM_BYTES]; ggm_tree_size]; times],
             depth: depth,
-            m0: vec![[0u8; 48]; depth + 1],
-            m1: vec![[0u8; 48]; depth + 1],
+            m0: vec![vec![[0u8; 48]; depth + 1]; times],
+            m1: vec![vec![[0u8; 48]; depth + 1]; times],
+            times: times,
         }
     }
 
-    pub fn compute(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES], beta: [u8; NUM_BYTES]) {
-        self.beta = beta.clone();
-        self.idcf_gen(idcf_sharing, key);
+    pub fn compute(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES], beta: [u8; NUM_BYTES], time: usize) {
+        self.beta[time] = beta.clone();
+        self.idcf_gen(idcf_sharing, key, time);
     }
 
     /// Send OT messages and secret sum.
-    pub fn send<IO: CommunicationChannel>(&self, io: &mut IO, ot: &mut OTPre<3>, s: usize, comm: &mut u64) {
+    pub fn send<IO: CommunicationChannel>(&self, io: &mut IO, ot: &mut OTPre<3>, comm: &mut u64) {
         ot.choices_sender(io, comm);
-        let ot_msg_0 = self.m0
-            .iter()
-            .map(|x| convert_u8_to_u128(x))
-            .collect::<Vec<[u128; 3]>>();
-        let ot_msg_1 = self.m1
-            .iter()
-            .map(|x| convert_u8_to_u128(x))
-            .collect::<Vec<[u128; 3]>>();
+        let mut ot_msg_0 = vec![[0u128; 3]; (self.depth + 1) * self.times];
+        for time in 0..self.times {
+            for h in 0..self.depth + 1 {
+                ot_msg_0[time * (self.depth + 1) + h] = convert_u8_to_u128(&self.m0[time][h]);
+            }
+        }
+        let mut ot_msg_1 = vec![[0u128; 3]; (self.depth + 1) * self.times];
+        for time in 0..self.times {
+            for h in 0..self.depth + 1 {
+                ot_msg_1[time * (self.depth + 1) + h] = convert_u8_to_u128(&self.m1[time][h]);
+            }
+        }
 
-        ot.send(io, &ot_msg_0, &ot_msg_1, self.depth + 1, s, comm);
+        ot.send(io, &ot_msg_0, &ot_msg_1, (self.depth + 1) * self.times, 0, comm);
 
         // for h in 0..(self.depth + 1) {
         //     println!("This OT:");
@@ -65,7 +70,7 @@ impl IDCFSender {
         // }
     }
 
-    pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES]) {
+    pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES], time: usize) {
         // Here, we assume fixed key AES to be Random Oracle
         let mut kg0 = [0u8; 16];
         let mut kg1 = [0u8; 16];
@@ -81,52 +86,52 @@ impl IDCFSender {
         let mut c1 = Aes128::new(GenericArray::from_slice(&kc1));
 
         // The root of the base GGM tree is the secret (seed)
-        self.base_ggm_tree[0] = key.clone();
+        self.base_ggm_tree[time][0] = key.clone();
 
         // Every level after, expand 1-to-2
         for h in 1..self.depth + 1 {
             // Assign base GGM tree values and implementation tree values
-            let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+            let mut left_blocks: Vec<_> = self.base_ggm_tree[time][((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             // println!("Length of left_blocks: {}", left_blocks.len());
             g0.encrypt_blocks(&mut left_blocks);
             for i in 0..(1 << (h - 1)) {
-                self.base_ggm_tree[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
+                self.base_ggm_tree[time][((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
             }
 
-            let mut right_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+            let mut right_blocks: Vec<_> = self.base_ggm_tree[time][((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             g1.encrypt_blocks(&mut right_blocks);
             for i in 0..(1 << (h - 1)) {
-                self.base_ggm_tree[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
+                self.base_ggm_tree[time][((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
             }
 
-            let mut left_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+            let mut left_blocks: Vec<_> = self.base_ggm_tree[time][((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             c0.encrypt_blocks(&mut left_blocks);
             for i in 0..(1 << (h - 1)) {
-                self.implementation_values[((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
+                self.implementation_values[time][((1 << h) - 1) + (i << 1)].copy_from_slice(&left_blocks[i]);
             }
 
-            let mut right_blocks: Vec<_> = self.base_ggm_tree[((1 << (h-1)) - 1)..((1 << h) - 1)]
+            let mut right_blocks: Vec<_> = self.base_ggm_tree[time][((1 << (h-1)) - 1)..((1 << h) - 1)]
                 .iter()
                 .map(|x| GenericArray::clone_from_slice(x))
                 .collect();
             c1.encrypt_blocks(&mut right_blocks);
             for i in 0..(1 << (h - 1)) {
-                self.implementation_values[((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
+                self.implementation_values[time][((1 << h) - 1) + ((i << 1) ^ 1)].copy_from_slice(&right_blocks[i]);
             }
 
             // Compute the left-right sums
             let mut left_base = [0u8; NUM_BYTES];
             let mut right_base = [0u8; NUM_BYTES];
-            self.base_ggm_tree[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().enumerate().for_each(|(i, x)| {
+            self.base_ggm_tree[time][((1 << h) - 1)..((1 << (h+1)) - 1)].iter().enumerate().for_each(|(i, x)| {
                 if i & 1 == 1 {
                     xor_block(&mut right_base, x);
                 } else {
@@ -135,7 +140,7 @@ impl IDCFSender {
             });
             let mut left_impl = [0u8; NUM_BYTES];
             let mut right_impl = [0u8; NUM_BYTES];
-            self.implementation_values[((1 << h) - 1)..((1 << (h+1)) - 1)].iter().enumerate().for_each(|(i, x)| {
+            self.implementation_values[time][((1 << h) - 1)..((1 << (h+1)) - 1)].iter().enumerate().for_each(|(i, x)| {
                 if i & 1 == 1 {
                     xor_block(&mut right_impl, x);
                 } else {
@@ -147,42 +152,43 @@ impl IDCFSender {
             // println!("Right impl: {:?}", right_impl);
             // println!("Current layer implementation values:");
             // for i in 0..(1 << h) {
-            //     println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            //     println!("{:?}", self.implementation_values[time][(1 << h) - 1 + i]);
             // }
 
             // Compute the OT messages
-            self.m0[h][0..16].copy_from_slice(&right_base);
-            self.m1[h][0..16].copy_from_slice(&left_base);
+            self.m0[time][h][0..16].copy_from_slice(&right_base);
+            self.m1[time][h][0..16].copy_from_slice(&left_base);
             if h == 1 {
-                xor_block(&mut left_impl, &self.beta);
-                xor_block(&mut right_impl, &self.beta);
-                self.m0[h][16..32].copy_from_slice(&left_impl);
-                self.m0[h][32..48].copy_from_slice(&right_impl);
-                xor_block(&mut left_impl, &self.beta);
-                self.m1[h][16..32].copy_from_slice(&left_impl);
-                self.m1[h][32..48].copy_from_slice(&right_impl);
+                xor_block(&mut left_impl, &self.beta[time]);
+                xor_block(&mut right_impl, &self.beta[time]);
+                self.m0[time][h][16..32].copy_from_slice(&left_impl);
+                self.m0[time][h][32..48].copy_from_slice(&right_impl);
+                xor_block(&mut left_impl, &self.beta[time]);
+                self.m1[time][h][16..32].copy_from_slice(&left_impl);
+                self.m1[time][h][32..48].copy_from_slice(&right_impl);
             } else {
-                self.m0[h][16..32].copy_from_slice(&left_impl);
-                self.m0[h][32..48].copy_from_slice(&right_impl);
-                xor_block(&mut left_impl, &self.beta);
-                self.m1[h][16..32].copy_from_slice(&left_impl);
-                self.m1[h][32..48].copy_from_slice(&right_impl);
+                self.m0[time][h][16..32].copy_from_slice(&left_impl);
+                self.m0[time][h][32..48].copy_from_slice(&right_impl);
+                xor_block(&mut left_impl, &self.beta[time]);
+                self.m1[time][h][16..32].copy_from_slice(&left_impl);
+                self.m1[time][h][32..48].copy_from_slice(&right_impl);
             }
         }
 
-        idcf_sharing[1] = self.implementation_values[1];
-        idcf_sharing[2] = self.implementation_values[2];
+        idcf_sharing[1] = self.implementation_values[time][1];
+        idcf_sharing[2] = self.implementation_values[time][2];
         for h in 2..self.depth + 1 {
             for x in 0..(1 << h) {
                 idcf_sharing[(1 << h) - 1 + x as usize] = idcf_sharing[(1 << (h - 1)) - 1 + (x >> 1) as usize];
-                xor_block(&mut idcf_sharing[(1 << h) - 1 + x as usize], &self.implementation_values[(1 << h) - 1 + x as usize]);
+                xor_block(&mut idcf_sharing[(1 << h) - 1 + x as usize], &self.implementation_values[time][(1 << h) - 1 + x as usize]);
             }
         }
+        // println!("IDCF generation time: {:?}", start.elapsed());
     }
 
     // Only for debug
-    pub fn consistency_check<IO: CommunicationChannel>(&self, io: &mut IO, idcf_sharing: &[[u8; NUM_BYTES]]) {
-        io.send_u8(&self.beta).expect("Failed to send beta for testing");
+    pub fn consistency_check<IO: CommunicationChannel>(&self, io: &mut IO, idcf_sharing: &[[u8; NUM_BYTES]], time: usize) {
+        io.send_u8(&self.beta[time]).expect("Failed to send beta for testing");
         io.send_block::<NUM_BYTES>(idcf_sharing).unwrap();
     }
 }

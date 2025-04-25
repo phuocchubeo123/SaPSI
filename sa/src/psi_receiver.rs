@@ -6,6 +6,7 @@ use psi_network::comm_channel::CommunicationChannel;
 use rand::prelude::*;
 use sha3::{Digest, Sha3_256};
 use std::collections::HashSet;
+use std::time::Instant;
 
 const DIMENSION: usize = 2;
 const RANGE_BITS: usize = 5; // RANGE = 2^RANGE_BITS
@@ -57,25 +58,29 @@ impl SAPSIReceiver {
         sender_cot.cot_gen_preot(io, &mut sender_pre_ot, size * times, None, comm);
 
         // Sample random beta
-        let mut beta = [0u8; 16];
-        let mut key = [0u8; 16];
+        let mut beta = vec![[0u8; 16]; self.table_size * DIMENSION];
+        let mut key = vec![[0u8; 16]; self.table_size * DIMENSION];
         let mut rng_seed = rand::thread_rng();
-        rng_seed.fill(&mut beta);
-        rng_seed.fill(&mut key);
-
+        for i in 0..self.table_size * DIMENSION {
+            rng_seed.fill(&mut beta[i]);
+            rng_seed.fill(&mut key[i]);
+        }
 
         // Generate IDCF
         let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
+        let mut idcf_sender = IDCFSender::new(depth, self.table_size * DIMENSION);
         for index in 0..self.table_size {
             idcf_table.push(Vec::new());
             for dim in 0..DIMENSION {
-                let mut idcf_sender = IDCFSender::new(depth);
                 let mut idcf_sharing = vec![[0u8; 16]; 1 << (RANGE_BITS + 1)];
-                idcf_sender.compute(&mut idcf_sharing, key, beta);
-                idcf_sender.send(io, &mut sender_pre_ot, index * DIMENSION + dim, comm);
+                idcf_sender.compute(&mut idcf_sharing, key[index * DIMENSION + dim], beta[index * DIMENSION + dim], index * DIMENSION + dim);
                 idcf_table[index].push(idcf_sharing);
             }
         }
+        
+        let start = Instant::now();
+        idcf_sender.send(io, &mut sender_pre_ot, comm);
+        println!("Sender sent IDCF in {:?}", start.elapsed());
 
         let mut hashes_set: Vec<HashSet<[u8; 16]>> = Vec::new();
 

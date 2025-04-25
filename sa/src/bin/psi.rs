@@ -14,6 +14,7 @@ use psi_network::comm_channel::CommunicationChannel;
 use std::env;
 use std::net::{TcpListener, TcpStream};
 use std::collections::HashSet;
+use std::time::Instant;
 use rand::prelude::*;
 use rand_chacha::rand_core::{SeedableRng, RngCore};
 use rand_chacha::ChaCha12Rng;
@@ -55,7 +56,7 @@ fn main() {
     let mut comm: u64 = 0;
 
     const depth: usize = 5;
-    const size: usize = 1 << 8;
+    const size: usize = 1 << 12;
     const table_size: usize = ((size as f32) * 2.0) as usize;
 
     if role == "receiver" {
@@ -80,9 +81,12 @@ fn main() {
             }
         });
 
+        let start = Instant::now();
+
         let mut receiver_psi = SAPSIReceiver::new(size, table_size);
         receiver_psi.receive(&mut channel, &data, &mut comm);
-        println!("Receiver finished");
+
+        println!("Receiver finished in {:?}", start.elapsed());
     } else if role == "sender" {
         let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
@@ -95,9 +99,11 @@ fn main() {
 
         let data = gen_origins(&mut rng, size);
 
+        let start = Instant::now();
+
         let mut sender_psi = SAPSISender::new(size, table_size);
         sender_psi.send(&mut channel, &data, &mut comm);
 
-        println!("Sender finished");
+        println!("Sender finished in {:?}", start.elapsed());
     }
 }

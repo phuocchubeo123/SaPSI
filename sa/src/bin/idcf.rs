@@ -47,12 +47,13 @@ fn main() {
 
         // Now generate the IDCF
         let alpha = [13u8; 16];
-        let mut idcf_receiver = IDCFReceiver::new(depth);
+        let mut idcf_receiver = IDCFReceiver::new(depth, 1);
 
-        idcf_receiver.receive(&mut channel, &mut receiver_pre_ot, alpha, 0,  &mut comm);
-        idcf_receiver.compute(&mut idcf_sharing);
+        idcf_receiver.set_alpha(alpha, 0);
+        idcf_receiver.receive(&mut channel, &mut receiver_pre_ot, &mut comm);
+        idcf_receiver.compute(&mut idcf_sharing, 0);
 
-        idcf_receiver.consistency_check(&mut channel, &idcf_sharing);
+        idcf_receiver.consistency_check(&mut channel, &idcf_sharing, 0);
     } else if role == "sender" {
         // Connect to the receiver
         let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
@@ -76,11 +77,11 @@ fn main() {
         let mut key = [0u8; 16];
         let mut rng_seed = rand::thread_rng();
         rng_seed.fill(&mut key);
-        let mut idcf_sender = IDCFSender::new(depth);
+        let mut idcf_sender = IDCFSender::new(depth, 1);
 
-        idcf_sender.compute(&mut idcf_sharing, key, beta);
-        idcf_sender.send(&mut channel, &mut sender_pre_ot, 0, &mut comm);
+        idcf_sender.compute(&mut idcf_sharing, key, beta, 0);
+        idcf_sender.send(&mut channel, &mut sender_pre_ot, &mut comm);
 
-        idcf_sender.consistency_check(&mut channel, &idcf_sharing);
+        idcf_sender.consistency_check(&mut channel, &idcf_sharing, 0);
     }
 }

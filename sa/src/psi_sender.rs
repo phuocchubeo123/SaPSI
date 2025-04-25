@@ -1,3 +1,4 @@
+use std::time::Instant;
 use std::vec;
 use std::collections::HashSet;
 use crate::cuckoo::{CuckooHash, SimpleHash}; 
@@ -69,18 +70,23 @@ impl SAPSISender {
         let mut receiver_pre_ot = OTPre::<3>::new(size, times);
         receiver_cot.cot_gen_preot(io, &mut receiver_pre_ot, size * times, Some(&choice_bits), comm);
 
-        let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
+        let mut idcf_receiver = IDCFReceiver::new(depth, self.table_size * DIMENSION);
         for index in 0..self.table_size {
-            idcf_table.push(Vec::new());
             let (origin, recentered_point) = cuckoo_table.query_table(index);
             for dim in 0..DIMENSION {
                 let alpha = recentered_point[dim].to_le_bytes();
-                // println!("Alpha bits: {:?}", &alpha);
-                let mut idcf_receiver = IDCFReceiver::new(depth);
-                idcf_receiver.receive(io, &mut receiver_pre_ot, alpha, index * DIMENSION + dim, comm);
+            idcf_receiver.set_alpha(alpha, index * DIMENSION + dim);
+            }
+        }
 
+        idcf_receiver.receive(io, &mut receiver_pre_ot, comm);
+
+        let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
+        for index in 0..self.table_size {
+            idcf_table.push(Vec::new());
+            for dim in 0..DIMENSION {
                 let mut idcf_sharing = vec![[0u8; 16]; 1 << (RANGE_BITS + 1)];
-                idcf_receiver.compute(&mut idcf_sharing);
+                idcf_receiver.compute(&mut idcf_sharing, index * DIMENSION + dim);
                 idcf_table[index].push(idcf_sharing);
             }
         }
