@@ -7,10 +7,11 @@ use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
 use rand::prelude::*;
-use sha3::{Digest, Sha3_256};
+use blake2::{Blake2s256, Digest};
 
 const DIMENSION: usize = 2;
-const RANGE_BITS: usize = 5; // RANGE = 2^RANGE_BITS
+const RADIUS_BITS: usize = 4;
+const RANGE_BITS: usize = RADIUS_BITS + 2; // RANGE = 2^RANGE_BITS
 const LOC_FUNC_COUNT: usize = 3;
 
 // URGENT: Need to implement OPRF
@@ -41,7 +42,7 @@ impl SAPSISender {
         }).collect();
 
         let mut cuckoo_table = CuckooHash::<DIMENSION>::new(self.table_size, 20);
-        cuckoo_table.generate_loc_funcs(LOC_FUNC_COUNT, None);
+        cuckoo_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
 
         origins.iter().zip(recentered_points.iter()).for_each(|(origin, recentered_point)| {
             // println!("Inserting origin: {:?}", origin);
@@ -60,7 +61,8 @@ impl SAPSISender {
 
         // Original COT generation
         let size = depth + 1; // Number of COTs
-        let times = self.table_size * DIMENSION;
+        let times = self.table_size * DIMENSION * 2;
+        println!("Times: {}", times);
         let mut choice_bits = vec![false; size * times];
         // Populate random choice bits
         for bit in &mut choice_bits {
@@ -70,16 +72,30 @@ impl SAPSISender {
         let mut receiver_pre_ot = OTPre::<3>::new(size, times);
         receiver_cot.cot_gen_preot(io, &mut receiver_pre_ot, size * times, Some(&choice_bits), comm);
 
-        let mut idcf_receiver = IDCFReceiver::new(depth, self.table_size * DIMENSION);
+        let mut idcf_receiver = IDCFReceiver::new(depth, times);
         for index in 0..self.table_size {
             let (origin, recentered_point) = cuckoo_table.query_table(index);
-            for dim in 0..DIMENSION {
-                let alpha = recentered_point[dim].to_le_bytes();
-            idcf_receiver.set_alpha(alpha, index * DIMENSION + dim);
+            if recentered_point == [0u128; DIMENSION] {
+                for dim in 0..DIMENSION {
+                    idcf_receiver.set_alpha([0u8; 16], 2 * (index * DIMENSION + dim));
+                    idcf_receiver.set_alpha([0u8; 16], 2 * (index * DIMENSION + dim) + 1);
+                }
+            } else {
+                for dim in 0..DIMENSION {
+                    let mut floor = recentered_point[dim] - (1 << RADIUS_BITS);
+                    let mut ceil = recentered_point[dim] + (1 << RADIUS_BITS);
+
+                    let alpha_floor = ((1 << RANGE_BITS) - floor).to_le_bytes();
+                    idcf_receiver.set_alpha(alpha_floor, 2 * (index * DIMENSION + dim));
+                    let alpha_ceil = (ceil + 1).to_le_bytes();
+                    idcf_receiver.set_alpha(alpha_ceil, 2 * (index * DIMENSION + dim) + 1);
+                }
             }
         }
 
         idcf_receiver.receive(io, &mut receiver_pre_ot, comm);
+
+        let start = Instant::now();
 
         let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
         for index in 0..self.table_size {
@@ -91,13 +107,15 @@ impl SAPSISender {
             }
         }
 
+        println!("Sender computed IDCF in {:?}", start.elapsed());
+
         // Receive hashes from the receiver
-        let mut hashes: Vec<Vec<[u8; 16]>> = Vec::new();
+        let mut hashes: Vec<Vec<[u8; 32]>> = Vec::new();
         for index in 0..self.table_size {
-            let hash = io.receive_block::<16>().expect("Failed to receive intersection hash from receiver");
+            let hash = io.receive_block::<32>().expect("Failed to receive intersection hash from receiver");
             hashes.push(hash);
         }
-        let mut hashes_set: Vec<HashSet<[u8; 16]>> = Vec::new();
+        let mut hashes_set: Vec<HashSet<[u8; 32]>> = Vec::new();
         for index in 0..self.table_size {
             let mut hash_set = HashSet::new();
             hashes[index].iter().for_each(|h| {
@@ -106,6 +124,7 @@ impl SAPSISender {
             hashes_set.push(hash_set);
         }
 
+        let start = Instant::now();
         // Now start doing PSI in each bin
         for index in 0..self.table_size {
             let (_origin, recentered_point) = cuckoo_table.query_table(index);
@@ -137,11 +156,13 @@ impl SAPSISender {
                 self.int_search(&idcf_table[index], index, &pref, &length, &hashes_set[index]);
             });
         }
+
+        println!("Sender computed intersection in {:?}", start.elapsed());
     }
 
-    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, prefix: &[[u8; 16]; DIMENSION], length: &[usize; DIMENSION], hashes: &HashSet<[u8; 16]>) {
+    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, prefix: &[[u8; 16]; DIMENSION], length: &[usize; DIMENSION], hashes: &HashSet<[u8; 32]>) {
         // Get the corresponding hash
-        let mut hasher = Sha3_256::new();
+        let mut hasher = Blake2s256::new();
         hasher.update(&index.to_le_bytes());
         for i in 0..DIMENSION {
             hasher.update(prefix[i]);
@@ -149,8 +170,8 @@ impl SAPSISender {
         for i in 0..DIMENSION {
             hasher.update(idcf_table[i][u128::from_le_bytes(prefix[i]) as usize]);
         }
-        let mut hsh = [0u8; 16];
-        hsh.copy_from_slice(&hasher.finalize()[..16]);
+        let mut hsh = [0u8; 32];
+        hsh.copy_from_slice(&hasher.finalize());
 
         if !hashes.contains(&hsh) {
             return;
@@ -177,8 +198,11 @@ impl SAPSISender {
 fn get_origin(point: &[u128; DIMENSION]) -> [u128; DIMENSION] {
     let mut origin = [0u128; DIMENSION];
     for i in 0..DIMENSION {
-        origin[i] = point[i];
-        origin[i] = (origin[i] >> RANGE_BITS) << RANGE_BITS;
+        origin[i] = (point[i] >> (RADIUS_BITS + 1)) << (RADIUS_BITS + 1);
+        if point[i] - origin[i] > (1 << RADIUS_BITS) {
+            origin[i] += (1 << (RADIUS_BITS + 1));
+        }
+        origin[i] -= (1 << RADIUS_BITS);
     }
     origin
 }

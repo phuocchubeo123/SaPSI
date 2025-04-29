@@ -52,6 +52,8 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
         for (i, block) in aes_blocks.iter().enumerate() {
             self.loc_funcs[i].copy_from_slice(block.as_slice());
         }
+
+        println!("loc_funcs: {:?}", self.loc_funcs);
     }
 
     pub fn location(&self, item: &[u128; NUM_LIMBS], loc_func_index: usize) -> usize {
@@ -184,6 +186,8 @@ impl<const NUM_LIMBS: usize> SimpleHash<NUM_LIMBS> {
         for (i, block) in aes_blocks.iter().enumerate() {
             self.loc_funcs[i].copy_from_slice(block.as_slice());
         }
+
+        println!("loc_funcs: {:?}", self.loc_funcs);
     }
 
     pub fn location(&self, item: &[u128; NUM_LIMBS], loc_func_index: usize) -> usize {

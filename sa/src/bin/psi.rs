@@ -4,7 +4,8 @@ extern crate rand;
 extern crate rand_chacha;
 
 const DIMENSION: usize = 2;
-const RANGE_BITS: usize = 5; // RANGE = 2^RANGE_BITS
+const RADIUS_BITS: usize = 4;
+const RANGE_BITS: usize = RADIUS_BITS + 2; // RANGE = 2^RANGE_BITS
 const LOC_FUNC_COUNT: usize = 3;
 
 use psi_sa::psi_sender::SAPSISender;
@@ -55,9 +56,8 @@ fn main() {
     let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
     let mut comm: u64 = 0;
 
-    const depth: usize = 5;
     const size: usize = 1 << 12;
-    const table_size: usize = ((size as f32) * 2.0) as usize;
+    const table_size: usize = ((size as f32) * 1.8) as usize;
 
     if role == "receiver" {
         println!("Starting as Receiver...");
@@ -72,7 +72,7 @@ fn main() {
         let mut data: Vec<[u128; DIMENSION]> = Vec::new();
 
         origins.iter().for_each(|origin| {
-            for i in 0..(rand::random::<usize>() % 5) {
+            for i in 0..2 {
                 let mut point = gen_input(&mut rng);
                 for j in 0..DIMENSION {
                     point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];

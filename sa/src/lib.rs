@@ -4,6 +4,7 @@ extern crate psi_aes;
 extern crate sha3;
 extern crate rand;
 extern crate aes;
+extern crate blake2;
 
 pub mod cuckoo;
 pub mod idcf_sender;

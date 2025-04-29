@@ -4,12 +4,16 @@ use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
 use rand::prelude::*;
-use sha3::{Digest, Sha3_256};
+// use sha3::{Digest, Sha3_256};
+use blake2::{Blake2s, Blake2s256, Digest};
 use std::collections::HashSet;
 use std::time::Instant;
+use std::cmp::max;
+use std::convert::TryInto;
 
 const DIMENSION: usize = 2;
-const RANGE_BITS: usize = 5; // RANGE = 2^RANGE_BITS
+const RADIUS_BITS: usize = 4;
+const RANGE_BITS: usize = RADIUS_BITS + 2; // RANGE = 2^RANGE_BITS
 const LOC_FUNC_COUNT: usize = 3;
 
 pub struct SAPSIReceiver {
@@ -26,19 +30,25 @@ impl SAPSIReceiver {
     }
 
     pub fn receive<IO: CommunicationChannel>(&self, io: &mut IO, values: &[[u128; DIMENSION]], comm: &mut u64) {
-        let origins: Vec<[u128; DIMENSION]> = values.iter().map(|point| get_origin(point)).collect();
-        let recentered_points: Vec<[u128; DIMENSION]> = values.iter().enumerate().map(|(i, point)| {
-            let mut recentered_point = [0u128; DIMENSION];
-            for j in 0..DIMENSION {
-                recentered_point[j] = point[j] - origins[i][j];
-            }
-            recentered_point
+        let origins: Vec<Vec<[u128; DIMENSION]>> = values.iter().map(|point| get_origins(point)).collect();
+        let recentered_points: Vec<Vec<[u128; DIMENSION]>> = values.iter().enumerate().map(|(i, point)| {
+            let points = origins[i].iter().map(|origin| {
+                let mut recentered_point = [0u128; DIMENSION];
+                for j in 0..DIMENSION {
+                    recentered_point[j] = point[j] - origin[j];
+                }
+                recentered_point
+            }).collect::<Vec<[u128; DIMENSION]>>();
+            points
         }).collect();
 
-        let mut simple_table = SimpleHash::<DIMENSION>::new(self.table_size, 10, LOC_FUNC_COUNT);
+        let mut simple_table = SimpleHash::<DIMENSION>::new(self.table_size, 100, LOC_FUNC_COUNT);
+        simple_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
         origins.iter().zip(recentered_points.iter()).for_each(|(origin, recentered_point)| {
-            let res: bool = simple_table.insert(origin, recentered_point);
-            assert!(res, "Insertion failed");
+            origin.iter().zip(recentered_point.iter()).for_each(|(origin, recentered_point)| {
+                let res: bool = simple_table.insert(origin, recentered_point);
+                assert!(res, "Insertion failed");
+            });
         });
 
         let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
@@ -52,64 +62,89 @@ impl SAPSIReceiver {
 
         // Original COT generation
         let size = depth + 1; // Number of COTs
-        let times = self.table_size * DIMENSION;
+        let times = self.table_size * DIMENSION * 2;
         // New COT generation using OTPre
         let mut sender_pre_ot = OTPre::<3>::new(size, times);
         sender_cot.cot_gen_preot(io, &mut sender_pre_ot, size * times, None, comm);
 
         // Sample random beta
-        let mut beta = vec![[0u8; 16]; self.table_size * DIMENSION];
-        let mut key = vec![[0u8; 16]; self.table_size * DIMENSION];
+        let mut beta = vec![[0u8; 16]; times];
+        let mut key = vec![[0u8; 16]; times];
         let mut rng_seed = rand::thread_rng();
-        for i in 0..self.table_size * DIMENSION {
+        for i in 0..times {
             rng_seed.fill(&mut beta[i]);
             rng_seed.fill(&mut key[i]);
         }
 
         // Generate IDCF
+        let start = Instant::now();
+
         let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
-        let mut idcf_sender = IDCFSender::new(depth, self.table_size * DIMENSION);
+        let mut idcf_sender = IDCFSender::new(depth, times);
         for index in 0..self.table_size {
             idcf_table.push(Vec::new());
             for dim in 0..DIMENSION {
                 let mut idcf_sharing = vec![[0u8; 16]; 1 << (RANGE_BITS + 1)];
-                idcf_sender.compute(&mut idcf_sharing, key[index * DIMENSION + dim], beta[index * DIMENSION + dim], index * DIMENSION + dim);
+                idcf_sender.compute(&mut idcf_sharing, key[(index * DIMENSION + dim) * 2], beta[(index * DIMENSION + dim) * 2], (index * DIMENSION + dim) * 2);
+                idcf_table[index].push(idcf_sharing);
+                let mut idcf_sharing = vec![[0u8; 16]; 1 << (RANGE_BITS + 1)];
+                idcf_sender.compute(&mut idcf_sharing, key[(index * DIMENSION + dim) * 2 + 1], beta[(index * DIMENSION + dim) * 2 + 1], (index * DIMENSION + dim) * 2 + 1);
                 idcf_table[index].push(idcf_sharing);
             }
         }
+            
+        println!("Receiver computed IDCF in {:?}", start.elapsed());
         
         let start = Instant::now();
         idcf_sender.send(io, &mut sender_pre_ot, comm);
-        println!("Sender sent IDCF in {:?}", start.elapsed());
+        println!("Receiver sent IDCF in {:?}", start.elapsed());
 
-        let mut hashes_set: Vec<HashSet<[u8; 16]>> = Vec::new();
+        let mut hashes_set: Vec<HashSet<[u8; 32]>> = Vec::new();
 
         // Send the hash values
+        let start = Instant::now();
+
+        // Delta= 16, Mini universe 32 * 32
+        // m * 2^DIMENSION * 3 * (6^DIMENSION)
+
+        let mut max_bin_size = 0;
+
         for index in 0..self.table_size {
-            hashes_set.push(HashSet::<[u8; 16]>::new());
             let points_set = simple_table.query_table(index);
             points_set.iter().for_each(|(origin, recentered_point)| {
+                let mut hashes = HashSet::<[u8; 32]>::new();
                 let prefixes = get_prefixes(recentered_point);
-                prefixes.iter().for_each(|prefix| {
+                let counter_recentered_point = recentered_point.iter().map({
+                    |x| (1 << RANGE_BITS) - x - 1
+                }).collect::<Vec<u128>>();
+                let counter_prefixes = get_prefixes(&counter_recentered_point.try_into().unwrap());
+                prefixes.iter().zip(counter_prefixes.iter()).for_each(|(prefix, counter_prefix)| {
                     // Get the corresponding hash
-                    let mut hasher = Sha3_256::new();
-                    hasher.update(&index.to_le_bytes());
+                    let mut to_be_hashed = Vec::<u8>::new();
+                    to_be_hashed.extend_from_slice(&index.to_le_bytes());
                     for i in 0..DIMENSION {
-                        hasher.update(prefix[i].to_le_bytes());
+                        to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
+                        to_be_hashed.extend_from_slice(&idcf_table[index][i*2][prefix[i] as usize]);
+                        to_be_hashed.extend_from_slice(&idcf_table[index][i*2 + 1][counter_prefix[i] as usize]); // need to correct later
                     }
-                    for i in 0..DIMENSION {
-                        hasher.update(idcf_table[index][i][prefix[i] as usize]);
-                    }
-                    let mut hsh = [0u8; 16];
-                    hsh.copy_from_slice(&hasher.finalize()[..16]);
-                    hashes_set[index].insert(hsh);
+                    let mut hasher= Blake2s256::new();
+                    hasher.update(&to_be_hashed);
+                    let mut hsh = [0u8; 32];
+                    hsh.copy_from_slice(&hasher.finalize());
+                    hashes.insert(hsh);
                 });
+                hashes_set.push(hashes);
             });
+            max_bin_size = max(max_bin_size, points_set.len());
         }
 
-        let mut hashes: Vec<Vec<[u8; 16]>> = Vec::new();
+        println!("Max bin size: {}", max_bin_size);
+
+        println!("Receiver computed hashes in {:?}", start.elapsed());
+
+        let mut hashes: Vec<Vec<[u8; 32]>> = Vec::new();
         for index in 0..self.table_size {
-            let mut hash = Vec::<[u8; 16]>::new();
+            let mut hash = Vec::<[u8; 32]>::new();
             let mut i = 0;
             hashes_set[index].iter().for_each(|h| {
                 hash.push(*h);
@@ -118,18 +153,29 @@ impl SAPSIReceiver {
         }
 
         for index in 0..self.table_size {
-            *comm += io.send_block::<16>(&hashes[index]).expect("Failed to send intersection hash");
+            *comm += io.send_block::<32>(&hashes[index]).expect("Failed to send intersection hash");
         }
     }
 }
 
-fn get_origin(point: &[u128; DIMENSION]) -> [u128; DIMENSION] {
+fn get_origins(point: &[u128; DIMENSION]) -> Vec<[u128; DIMENSION]> {
     let mut origin = [0u128; DIMENSION];
     for i in 0..DIMENSION {
         origin[i] = point[i];
-        origin[i] = (origin[i] >> RANGE_BITS) << RANGE_BITS;
+        origin[i] = (origin[i] >> (RADIUS_BITS + 1)) << (RADIUS_BITS + 1);
     }
-    origin
+
+    let mut origins = Vec::<[u128; DIMENSION]>::new();  
+    for mask in 0..(1 << DIMENSION) {
+        let mut new_origin = origin.clone();
+        for i in 0..DIMENSION {
+            if (mask >> i) & 1 == 1 {
+                new_origin[i] -= (1 << RANGE_BITS);
+            }
+        }
+        origins.push(new_origin);
+    }
+    origins
 }
 
 fn get_prefixes(point: &[u128; DIMENSION]) -> Vec<[u128; DIMENSION]> {
