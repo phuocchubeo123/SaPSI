@@ -53,8 +53,13 @@ fn main() {
             let idx = (s * 37) % size;
             let mut received_data = vec![[0u128; 2]; size];
             receiver_pre_ot.recv(&mut channel, &mut received_data, &choice_bits, size, s, &mut comm);
-            println!("Received data for iteration with choice bit {}: {:?}", choice_bits[idx], received_data[idx]);
+
+            for i in 0..size {
+                println!("OT number: {}", s * size + i);
+                println!("Receiver OT message: {:?}", received_data[i]);
+            }
         }
+
         let duration = start.elapsed();
         println!("Time taken: {:?}", duration);
     } else if role == "sender" {
@@ -90,7 +95,15 @@ fn main() {
                 m1[i] = [(s + 1) as u128; 2];
             }
             sender_pre_ot.send(&mut channel, &m0, &m1, size, s, &mut comm);
+
+            for i in 0..size {
+                println!("OT number: {}", s*size + i);
+                println!("Sender OT message 0: {:?}", m0);
+                println!("Sender OT message 1: {:?}", m1);
+            }
         }
+
+
     } else {
         panic!("Invalid role specified. Please specify 'sender' or 'receiver'.");
     }

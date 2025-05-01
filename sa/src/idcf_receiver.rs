@@ -46,9 +46,18 @@ impl IDCFReceiver {
         }
 
         ot.choices_recver(io, &choices, comm);
+        ot.reset();
 
         let mut ot_msg = vec![[0u128; 3]; (self.depth + 1) * self.times];
         ot.recv(io, &mut ot_msg, &choices, (self.depth + 1) * self.times, 0, comm);
+
+        for time in 0..self.times {
+            for h in 0..self.depth + 1 {
+                println!("OT number: {}", time * (self.depth + 1) + h);
+                println!("OT choice: {}", choices[time * (self.depth + 1) + h]);
+                println!("OT message: {:?}", ot_msg[time * (self.depth + 1) + h]);
+            }
+        }
 
         for time in 0..self.times {
             for h in 0..self.depth + 1 {
@@ -158,7 +167,7 @@ impl IDCFReceiver {
 
             // println!("Current layer implementation values after filling:");
             // for i in 0..(1 << h) {
-            //     println!("{:?}", self.implementation_values[(1 << h) - 1 + i]);
+            //     println!("{:?}", self.implementation_values[time][(1 << h) - 1 + i]);
             // }
 
 

@@ -155,7 +155,7 @@ impl<const NUM_LIMBS: usize> SimpleHash<NUM_LIMBS> {
     // Constructor to initialize the hash table with a given size and number of locations
     pub fn new(table_size: usize, max_bin_size: usize, loc_func_count: usize) -> Self {
         Self {
-            table: vec![vec![([0u128; NUM_LIMBS], [0u128; NUM_LIMBS]); 5]; table_size],
+            table: vec![vec![]; table_size],
             loc_funcs: vec![],
             table_size: table_size,
             max_bin_size: max_bin_size,

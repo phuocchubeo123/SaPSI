@@ -48,6 +48,7 @@ impl IDCFSender {
     /// Send OT messages and secret sum.
     pub fn send<IO: CommunicationChannel>(&self, io: &mut IO, ot: &mut OTPre<3>, comm: &mut u64) {
         ot.choices_sender(io, comm);
+        ot.reset();
         let mut ot_msg_0 = vec![[0u128; 3]; (self.depth + 1) * self.times];
         for time in 0..self.times {
             for h in 0..self.depth + 1 {
@@ -63,11 +64,13 @@ impl IDCFSender {
 
         ot.send(io, &ot_msg_0, &ot_msg_1, (self.depth + 1) * self.times, 0, comm);
 
-        // for h in 0..(self.depth + 1) {
-        //     println!("This OT:");
-        //     println!("Sender sent sum of base values for alpha = 0: {:?}", ot_msg_0[h]);
-        //     println!("Sender sent sum of base values for alpha = 1: {:?}", ot_msg_1[h]);
-        // }
+        for time in 0..self.times {
+            for h in 0..self.depth + 1 {
+                println!("OT number: {}", time * (self.depth + 1) + h);
+                println!("Sender OT message 0: {:?}", ot_msg_0[time * (self.depth + 1) + h]);
+                println!("Sender OT message 1: {:?}", ot_msg_1[time * (self.depth + 1) + h]);
+            }
+        }
     }
 
     pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES], time: usize) {
