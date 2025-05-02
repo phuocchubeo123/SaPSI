@@ -31,7 +31,7 @@ impl IDCFReceiver {
     pub fn set_alpha(&mut self, alpha: [u8; 16], time: usize) {
         // We always assume that alpha here will not have more than 128 bits
         for i in 0..self.depth {
-            self.alpha[time][i + 1] = ((alpha[i / 8] >> (i % 8)) & 1) == 1;
+            self.alpha[time][self.depth - i] = ((alpha[i / 8] >> (i % 8)) & 1) == 1;
         }
     }
 
@@ -51,13 +51,13 @@ impl IDCFReceiver {
         let mut ot_msg = vec![[0u128; 3]; (self.depth + 1) * self.times];
         ot.recv(io, &mut ot_msg, &choices, (self.depth + 1) * self.times, 0, comm);
 
-        for time in 0..self.times {
-            for h in 0..self.depth + 1 {
-                println!("OT number: {}", time * (self.depth + 1) + h);
-                println!("OT choice: {}", choices[time * (self.depth + 1) + h]);
-                println!("OT message: {:?}", ot_msg[time * (self.depth + 1) + h]);
-            }
-        }
+        // for time in 0..self.times {
+        //     for h in 0..self.depth + 1 {
+        //         println!("OT number: {}", time * (self.depth + 1) + h);
+        //         println!("OT choice: {}", choices[time * (self.depth + 1) + h]);
+        //         println!("OT message: {:?}", ot_msg[time * (self.depth + 1) + h]);
+        //     }
+        // }
 
         for time in 0..self.times {
             for h in 0..self.depth + 1 {

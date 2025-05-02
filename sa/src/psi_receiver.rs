@@ -1,3 +1,4 @@
+use crate::config::*;
 use crate::cuckoo::SimpleHash; 
 use crate::idcf_sender::IDCFSender;
 use psi_ot::base_cot::BaseCot;
@@ -10,12 +11,6 @@ use std::collections::HashSet;
 use std::time::Instant;
 use std::cmp::max;
 use std::convert::TryInto;
-
-const DIMENSION: usize = 2;
-const DIMENSION2: usize = DIMENSION * 2; // As we need 2 range checks for each dimension
-const RADIUS: usize = 14;
-const RANGE_BITS: usize = 6; // RANGE = 2^RANGE_BITS
-const LOC_FUNC_COUNT: usize = 3;
 
 pub struct SAPSIReceiver {
     n: usize,
@@ -38,7 +33,7 @@ impl SAPSIReceiver {
         });
 
 
-        let mut simple_table = SimpleHash::<DIMENSION2>::new(self.table_size, 100, LOC_FUNC_COUNT);
+        let mut simple_table = SimpleHash::<DIMENSION2>::new(self.table_size, 100000, LOC_FUNC_COUNT);
         simple_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
         processed_points.iter().for_each(|(origin, transformed_point)| {
             let res: bool = simple_table.insert(origin, transformed_point);
@@ -46,14 +41,14 @@ impl SAPSIReceiver {
         });
 
         // print out the simple table
-        for index in 0..self.table_size {
-            println!("Index: {}", index);
-            let points = simple_table.query_table(index);
-            points.iter().for_each(|(origin, transformed_point)| {
-                println!("Origin: {:?}, Transformed Point: {:?}", origin, transformed_point);
-            });
-            println!("---------------------");
-        }
+        // for index in 0..self.table_size {
+        //     println!("Index: {}", index);
+        //     let points = simple_table.query_table(index);
+            // points.iter().for_each(|(origin, transformed_point)| {
+            //     println!("Origin: {:?}, Transformed Point: {:?}", origin, transformed_point);
+            // });
+            // println!("---------------------");
+        // }
 
         let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
 
@@ -68,7 +63,7 @@ impl SAPSIReceiver {
         let size = depth + 1; // Number of COTs
         let times = self.table_size * DIMENSION * 2;
         // New COT generation using OTPre
-        let mut sender_pre_ot = OTPre::<3>::new(size, times);
+        let mut sender_pre_ot = OTPre::<3>::new(size * times, 1);
         sender_cot.cot_gen_preot(io, &mut sender_pre_ot, size * times, None, comm);
 
         // Sample random beta
@@ -102,11 +97,11 @@ impl SAPSIReceiver {
         idcf_sender.send(io, &mut sender_pre_ot, comm);
         println!("Receiver sent IDCF in {:?}", start.elapsed());
 
-        for index in 0..self.table_size {
-            for dim in 0..DIMENSION2 {
-                idcf_sender.consistency_check(io, &idcf_table[index][dim], index * DIMENSION2 + dim);
-            }
-        }
+        // for index in 0..self.table_size {
+        //     for dim in 0..DIMENSION2 {
+        //         idcf_sender.consistency_check(io, &idcf_table[index][dim], index * DIMENSION2 + dim);
+        //     }
+        // }
 
         let mut hashes_set: Vec<HashSet<[u8; 32]>> = Vec::new();
 
@@ -120,28 +115,39 @@ impl SAPSIReceiver {
         let mut total_size = 0;
 
         for index in 0..self.table_size {
+            // println!("Index: {}", index);
             let points_set = simple_table.query_table(index);
+            let mut hashes = HashSet::<[u8; 32]>::new();
             points_set.iter().for_each(|(_origin, transformed_point)| {
-                let mut hashes = HashSet::<[u8; 32]>::new();
-                let prefixes = get_prefixes(transformed_point);
-                prefixes.iter().for_each(|prefix| {
+                let prefixes_and_lengths = get_prefixes(transformed_point);
+
+                // println!("Transformed Point: {:?}", transformed_point);
+                // println!("Prefixes: {:?}", prefixes);
+
+                prefixes_and_lengths.iter().for_each(|(prefix, length)| {
                     // Get the corresponding hash
                     let mut to_be_hashed = Vec::<u8>::new();
                     to_be_hashed.extend_from_slice(&index.to_le_bytes());
-                    for i in DIMENSION2..0 {
+                    for i in 0..DIMENSION2 {
                         to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
                     }
                     for i in 0..DIMENSION2 {
-                        to_be_hashed.extend_from_slice(idcf_table[index][i][prefix[i] as usize].as_slice());
+                        to_be_hashed.extend_from_slice(idcf_table[index][i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
                     }
                     let mut hasher= Blake2s256::new();
                     hasher.update(&to_be_hashed);
                     let mut hsh = [0u8; 32];
                     hsh.copy_from_slice(&hasher.finalize());
                     hashes.insert(hsh);
+
+                    // if index == 27 && transformed_point == &[39, 24, 16, 47] {
+                    //     println!("Prefix: {:?}, Length: {:?}", prefix, length);
+                    //     println!("To be hashed: {:?}", to_be_hashed);
+                    //     println!("Hash: {:?}", hsh);
+                    // }
                 });
-                hashes_set.push(hashes);
             });
+            hashes_set.push(hashes);
             total_size += points_set.len();
             max_bin_size = max(max_bin_size, points_set.len());
         }
@@ -151,15 +157,29 @@ impl SAPSIReceiver {
 
         println!("Receiver computed hashes in {:?}", start.elapsed());
 
+        // for dim in 0..DIMENSION2 {
+        //     for layer in 1..(depth + 1) {
+        //         println!("Layer {}", layer);
+        //         for x in 0..(1 << layer) {
+        //             println!("IDCF: {:?}", idcf_table[27][dim][(1 << layer) - 1 + x]);
+        //         }
+        //     }
+        // }
+
+
         let mut hashes: Vec<Vec<[u8; 32]>> = Vec::new();
         for index in 0..self.table_size {
             let mut hash = Vec::<[u8; 32]>::new();
-            let mut i = 0;
             hashes_set[index].iter().for_each(|h| {
+                // println!("Hash: {:?}", h);
                 hash.push(*h);
             });
             hashes.push(hash);
         }
+
+        // hashes[27].iter().for_each(|h| {
+        //     println!("Hash: {:?}", h);
+        // });
 
         for index in 0..self.table_size {
             *comm += io.send_block::<32>(&hashes[index]).expect("Failed to send intersection hash");
@@ -194,20 +214,35 @@ fn preprocess_point(point: &[u128; DIMENSION]) -> Vec<([u128; DIMENSION2], [u128
     result
 }
 
-fn get_prefixes(point: &[u128; DIMENSION2]) -> Vec<[u128; DIMENSION2]> {
-    let mut prefixes = vec![[0u128; DIMENSION2]];
+fn get_prefixes(point: &[u128; DIMENSION2]) -> Vec<([u128; DIMENSION2], [usize; DIMENSION2])> {
+    // println!("Point: {:?}", point);
+    let mut prefixes_and_lengths = vec![(*point, [RANGE_BITS; DIMENSION2])];
     for i in 0..DIMENSION2 {
-        let mut new_prefixes = Vec::<[u128; DIMENSION2]>::new();
-        prefixes.iter().for_each(|prefix| {
+        let mut new_prefixes_and_lengths = Vec::<([u128; DIMENSION2], [usize; DIMENSION2])>::new();
+        prefixes_and_lengths.iter().for_each(|(prefix, length)| {
             let mut new_prefix = prefix.clone();
-            for j in 0..RANGE_BITS {
-                new_prefix[i] |= ((point[i] >> j) & 1) << j;
-                if j > 1 {
-                    new_prefixes.push(new_prefix);
+            let mut new_length = length.clone();
+            for j in (0..RANGE_BITS).rev() {
+                if j >= PREF_CUT - 1 {
+                    new_prefixes_and_lengths.push((new_prefix, new_length));
                 }
+                new_prefix[i] >>= 1;
+                new_length[i] -= 1;
             }
         });
-        prefixes = new_prefixes;
+
+
+        prefixes_and_lengths = new_prefixes_and_lengths;
     }
-    prefixes
+
+    // if point == &[39, 24, 16, 47] {
+    //     println!("Point: {:?}", point);
+    //     prefixes_and_lengths.iter().for_each(|(prefix, length)| {
+    //         println!("Prefix: {:?}, Length: {:?}", prefix, length);
+    //     });
+    // }
+
+    // println!("Prefixes and lengths: {:?}", prefixes_and_lengths);
+
+    prefixes_and_lengths
 }

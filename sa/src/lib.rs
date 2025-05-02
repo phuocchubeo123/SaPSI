@@ -11,3 +11,4 @@ pub mod idcf_sender;
 pub mod idcf_receiver;
 pub mod psi_sender;
 pub mod psi_receiver;
+pub mod config;

@@ -1,19 +1,14 @@
+use crate::config::*;
+use crate::cuckoo::{CuckooHash, SimpleHash}; 
+use crate::idcf_receiver::IDCFReceiver;
 use std::time::Instant;
 use std::vec;
 use std::collections::HashSet;
-use crate::cuckoo::{CuckooHash, SimpleHash}; 
-use crate::idcf_receiver::IDCFReceiver;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
 use rand::prelude::*;
 use blake2::{Blake2s256, Digest};
-
-const DIMENSION: usize = 2;
-const DIMENSION2: usize = DIMENSION * 2; // As we need 2 range checks for each dimension
-const RADIUS: usize = 14;
-const RANGE_BITS: usize = 6; // RANGE = 2^RANGE_BITS
-const LOC_FUNC_COUNT: usize = 3;
 
 // URGENT: Need to implement OPRF
 
@@ -39,7 +34,7 @@ impl SAPSISender {
             .collect();
 
         // Prepare cuckoo hash table
-        let mut cuckoo_table = CuckooHash::<DIMENSION2>::new(self.table_size, 20);
+        let mut cuckoo_table = CuckooHash::<DIMENSION2>::new(self.table_size, 100);
         cuckoo_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
 
         processed_points.iter().for_each( |(origin, recentered_point)| {
@@ -48,12 +43,12 @@ impl SAPSISender {
         });
 
         // print out the cuckoo table
-        for index in 0..self.table_size {
-            let (origin, compare_point) = cuckoo_table.query_table(index);
-            println!("Index: {}", index);
-            println!("Origin: {:?}, Compare Point: {:?}", origin, compare_point);
-            println!("---------------------");
-        }
+        // for index in 0..self.table_size {
+        //     let (origin, compare_point) = cuckoo_table.query_table(index);
+        //     println!("Index: {}", index);
+        //     println!("Origin: {:?}, Compare Point: {:?}", origin, compare_point);
+        //     println!("---------------------");
+        // }
 
         // Prepare OTs
         let depth: usize = RANGE_BITS;
@@ -72,7 +67,7 @@ impl SAPSISender {
             *bit = rand::random();
         }
         // New COT generation using OTPre
-        let mut receiver_pre_ot = OTPre::<3>::new(size, times);
+        let mut receiver_pre_ot = OTPre::<3>::new(size * times, 1);
         receiver_cot.cot_gen_preot(io, &mut receiver_pre_ot, size * times, Some(&choice_bits), comm);
 
         let mut idcf_receiver = IDCFReceiver::new(depth, times);
@@ -104,12 +99,11 @@ impl SAPSISender {
             }
         }
 
-        for index in 0..self.table_size {
-            for dim in 0..DIMENSION2 { 
-                idcf_receiver.consistency_check(io, &idcf_table[index][dim], index * DIMENSION2 + dim);
-            }
-        }
-
+        // for index in 0..self.table_size {
+        //     for dim in 0..DIMENSION2 { 
+        //         idcf_receiver.consistency_check(io, &idcf_table[index][dim], index * DIMENSION2 + dim);
+        //     }
+        // }
         println!("Sender computed IDCF in {:?}", start.elapsed());
 
         // Receive hashes from the receiver
@@ -118,6 +112,7 @@ impl SAPSISender {
             let hash = io.receive_block::<32>().expect("Failed to receive intersection hash from receiver");
             hashes.push(hash);
         }
+
         let mut hashes_set: Vec<HashSet<[u8; 32]>> = Vec::new();
         for index in 0..self.table_size {
             let mut hash_set = HashSet::new();
@@ -131,6 +126,9 @@ impl SAPSISender {
         // Now start doing PSI in each bin
         for index in 0..self.table_size {
             let (_origin, compare_point) = cuckoo_table.query_table(index);
+
+            // println!("Index: {}", index);
+            // println!("Compare Point: {:?}", compare_point);
 
             // Create set of indicating prefixes
             let mut all_set_decompose: Vec<Vec<(u128, usize)>> = Vec::new();
@@ -155,9 +153,22 @@ impl SAPSISender {
 
             // Now start DFS
             good_prefix.iter().for_each(|(pref, length)| {
+                // println!("Prefix: {:?}, Length: {:?}", pref, length);
                 self.int_search(&idcf_table[index], index, &pref, &length, &hashes_set[index]);
             });
+
+            // println!();
         }
+
+        // for dim in 0..DIMENSION2 {
+        //     for layer in 1..(depth + 1) {
+        //         println!("Layer {}", layer);
+        //         for x in 0..(1 << layer) {
+        //             println!("IDCF: {:?}", idcf_table[27][dim][(1 << layer) - 1 + x]);
+        //         }
+        //     }
+        // }
+
 
         println!("Sender computed intersection in {:?}", start.elapsed());
         println!("Intersection size: {}", self.intersection.len());
@@ -165,11 +176,11 @@ impl SAPSISender {
 
     pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 32]>) {
         for i in 0..DIMENSION2 {
-            if length[i] < 3 {
+            if length[i] < PREF_CUT {
                 for b in 0..2 {
                     let mut new_prefix = prefix.clone();
                     let mut new_length = length.clone();
-                    new_prefix[i] |= b << length[i];
+                    new_prefix[i] = new_prefix[i] * 2 + b;
                     new_length[i] += 1;
                     self.int_search(idcf_table, index, &new_prefix, &new_length, hashes);
                 }
@@ -183,17 +194,25 @@ impl SAPSISender {
             to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
         }
         for i in 0..DIMENSION2 {
-            to_be_hashed.extend_from_slice(&idcf_table[i][prefix[i] as usize]);
+            to_be_hashed.extend_from_slice(idcf_table[i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
         }
         let mut hasher = Blake2s256::new();
         hasher.update(&to_be_hashed);
         let mut hsh = [0u8; 32];
         hsh.copy_from_slice(&hasher.finalize());
 
+        // if index == 27 {
+        //     println!("Prefix: {:?}, Length: {:?}", prefix, length);
+        //     println!("To be hashed: {:?}", to_be_hashed);
+        //     println!("Hash: {:?}", hsh);
+        // }
+
         // If the critical prefix hash is not in the hash set, prune
         if !hashes.contains(&hsh) {
             return;
         }
+
+        // println!("Found a match: {:?}, {:?}", prefix, length);
 
         if *length == [RANGE_BITS; DIMENSION2] {
             self.intersection.insert(*prefix);
@@ -204,10 +223,11 @@ impl SAPSISender {
                 for b in 0..2 {
                     let mut new_prefix = prefix.clone();
                     let mut new_length = length.clone();
-                    new_prefix[i] |= b << length[i];
+                    new_prefix[i] = new_prefix[i] * 2 + b;
                     new_length[i] += 1;
                     self.int_search(idcf_table, index, &new_prefix, &new_length, hashes);
                 }
+                return;
             }
         }
     }
@@ -237,16 +257,14 @@ fn preprocess_point(point: &[u128; DIMENSION]) -> ([u128; DIMENSION2], [u128; DI
 
 // This function returns both the prefixes and the length of these prefixes for search later
 fn set_decompose(point: u128) -> Vec<(u128, usize)> {
-    let mut x = 0u128;
+    let mut x = point;
     let mut res: Vec<(u128, usize)> = Vec::new();
-    for i in 0..RANGE_BITS {
-        let bit = point >> i & 1;
-        x |= bit << i;
-        if bit == 0 {
-            continue;
-        } else {
-            res.push((x^(1 << i), i+1));
-        }
+    for i in (0..RANGE_BITS).rev() {
+        if (x & 1) == 1 {
+            res.push((x ^ 1, i + 1));
+        } 
+        x >>= 1;
     }
+    // println!("Point: {}, Decomposed: {:?}", point, res);
     res
 }

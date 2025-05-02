@@ -3,12 +3,7 @@ extern crate psi_network;
 extern crate rand;
 extern crate rand_chacha;
 
-const DIMENSION: usize = 2;
-const DIMENSION2: usize = DIMENSION * 2; // As we need 2 range checks for each dimension
-const RADIUS: usize = 14;
-const RANGE_BITS: usize = 6; // RANGE = 2^RANGE_BITS
-const LOC_FUNC_COUNT: usize = 3;
-
+use psi_sa::config::*;
 use psi_sa::psi_sender::SAPSISender;
 use psi_sa::psi_receiver::SAPSIReceiver;
 use psi_network::socket_channel::TcpChannel;
@@ -58,7 +53,7 @@ fn main() {
     let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
     let mut comm: u64 = 0;
 
-    const size: usize = 1 << 4;
+    const size: usize = N;
     const table_size: usize = ((size as f32) * 1.8) as usize;
 
     if role == "receiver" {
@@ -79,7 +74,7 @@ fn main() {
                 for j in 0..DIMENSION {
                     point[j] = point[j] % (1 << RANGE_BITS);
                 }
-                println!("Origin: {:?}, Point: {:?}", origin, point);
+                // println!("Origin: {:?}, Point: {:?}", origin, point);
                 for j in 0..DIMENSION {
                     point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];
                 }
@@ -118,7 +113,7 @@ fn main() {
                 for j in 0..DIMENSION {
                     point[j] = point[j] % (1 << RANGE_BITS);
                 }
-                println!("Origin: {:?}, Point: {:?}", origin, point);
+                // println!("Origin: {:?}, Point: {:?}", origin, point);
                 for j in 0..DIMENSION {
                     point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];
                 }
