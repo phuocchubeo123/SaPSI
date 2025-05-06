@@ -40,7 +40,6 @@ impl RbOkvs {
 
 impl Okvs for RbOkvs {
     fn encode(&self, input: &Vec<Pair<FE, FE>>) -> Result<Vec<FE>> {
-        let start = Instant::now();
         let (matrix, start_pos, y) = self.create_sorted_matrix(input)?;
         simple_gauss(y, matrix, start_pos, self.columns, self.band_width)
     }
@@ -94,20 +93,9 @@ impl RbOkvs {
             *y_i = input[start_pos[i].0].1.to_owned();
         });
 
-        for i in (0..(n-7)).step_by(8) {
-            start_ids[i] = start_pos[i].1;
-            start_ids[i+1] = start_pos[i+1].1;
-            start_ids[i+2] = start_pos[i+2].1;
-            start_ids[i+3] = start_pos[i+3].1;
-            start_ids[i+4] = start_pos[i+4].1;
-            start_ids[i+5] = start_pos[i+5].1;
-            start_ids[i+6] = start_pos[i+6].1;
-            start_ids[i+7] = start_pos[i+7].1;
-        }
-
-        for i in (n - n % 8)..n {
-            start_ids[i] = start_pos[i].1;
-        }
+        start_ids.par_iter_mut().enumerate().for_each(|(i, start_ids_i)| {
+            *start_ids_i = start_pos[i].1;
+        });
 
         Ok((matrix, start_ids, y))
     }

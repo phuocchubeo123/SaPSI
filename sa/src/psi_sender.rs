@@ -8,7 +8,8 @@ use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
 use rand::prelude::*;
-use blake2::{Blake2s256, Digest};
+// use blake2::{Blake2s256, Digest};
+use blake3;
 
 // URGENT: Need to implement OPRF
 
@@ -176,7 +177,7 @@ impl SAPSISender {
 
     pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 32]>) {
         for i in 0..DIMENSION2 {
-            if length[i] < PREF_CUT {
+            if !PREF_LENGTH.contains(&length[i]) {
                 for b in 0..2 {
                     let mut new_prefix = prefix.clone();
                     let mut new_length = length.clone();
@@ -196,10 +197,12 @@ impl SAPSISender {
         for i in 0..DIMENSION2 {
             to_be_hashed.extend_from_slice(idcf_table[i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
         }
-        let mut hasher = Blake2s256::new();
-        hasher.update(&to_be_hashed);
+        let hash1 = blake3::hash(&to_be_hashed);
+        // let mut hasher = Blake2s256::new();
+        // hasher.update(&to_be_hashed);
         let mut hsh = [0u8; 32];
-        hsh.copy_from_slice(&hasher.finalize());
+        // hsh.copy_from_slice(&hasher.finalize());
+        hsh.copy_from_slice(hash1.as_bytes());
 
         // if index == 27 {
         //     println!("Prefix: {:?}, Length: {:?}", prefix, length);

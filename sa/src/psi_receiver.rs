@@ -6,7 +6,8 @@ use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
 use rand::prelude::*;
 // use sha3::{Digest, Sha3_256};
-use blake2::{Blake2s, Blake2s256, Digest};
+// use blake2::{Blake2s, Blake2s256, Digest};
+use blake3;
 use std::collections::HashSet;
 use std::time::Instant;
 use std::cmp::max;
@@ -97,6 +98,8 @@ impl SAPSIReceiver {
         idcf_sender.send(io, &mut sender_pre_ot, comm);
         println!("Receiver sent IDCF in {:?}", start.elapsed());
 
+        println!("Receiver communication after IDCF: {}", *comm);
+
         // for index in 0..self.table_size {
         //     for dim in 0..DIMENSION2 {
         //         idcf_sender.consistency_check(io, &idcf_table[index][dim], index * DIMENSION2 + dim);
@@ -113,6 +116,7 @@ impl SAPSIReceiver {
 
         let mut max_bin_size = 0;
         let mut total_size = 0;
+        let mut num_hashes = 0;
 
         for index in 0..self.table_size {
             // println!("Index: {}", index);
@@ -134,10 +138,14 @@ impl SAPSIReceiver {
                     for i in 0..DIMENSION2 {
                         to_be_hashed.extend_from_slice(idcf_table[index][i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
                     }
-                    let mut hasher= Blake2s256::new();
-                    hasher.update(&to_be_hashed);
+                    // let mut hasher= Blake2s256::new();
+                    // hasher.update(&to_be_hashed);
+                    // let start = Instant::now();
+                    let hash1 = blake3::hash(&to_be_hashed);
+                    // println!("Hashing time: {:?}", start.elapsed());
                     let mut hsh = [0u8; 32];
-                    hsh.copy_from_slice(&hasher.finalize());
+                    // hsh.copy_from_slice(&hasher.finalize());
+                    hsh.copy_from_slice(hash1.as_bytes());
                     hashes.insert(hsh);
 
                     // if index == 27 && transformed_point == &[39, 24, 16, 47] {
@@ -147,13 +155,14 @@ impl SAPSIReceiver {
                     // }
                 });
             });
-            hashes_set.push(hashes);
-            total_size += points_set.len();
+            hashes_set.push(hashes.clone());
+            num_hashes += hashes.len();
             max_bin_size = max(max_bin_size, points_set.len());
         }
 
         println!("Max bin size: {}", max_bin_size);
         println!("Total size: {}", total_size);
+        println!("Num hashes: {}", num_hashes);
 
         println!("Receiver computed hashes in {:?}", start.elapsed());
 
@@ -223,7 +232,7 @@ fn get_prefixes(point: &[u128; DIMENSION2]) -> Vec<([u128; DIMENSION2], [usize; 
             let mut new_prefix = prefix.clone();
             let mut new_length = length.clone();
             for j in (0..RANGE_BITS).rev() {
-                if j >= PREF_CUT - 1 {
+                if PREF_LENGTH.contains(&(j+1)) {
                     new_prefixes_and_lengths.push((new_prefix, new_length));
                 }
                 new_prefix[i] >>= 1;
@@ -241,6 +250,8 @@ fn get_prefixes(point: &[u128; DIMENSION2]) -> Vec<([u128; DIMENSION2], [usize; 
     //         println!("Prefix: {:?}, Length: {:?}", prefix, length);
     //     });
     // }
+
+    // println!("Prefixes and lengths: {:?}", prefixes_and_lengths);
 
     // println!("Prefixes and lengths: {:?}", prefixes_and_lengths);
 

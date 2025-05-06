@@ -170,7 +170,7 @@ pub fn simple_gauss(
 }
 
 
-const MASK: [u64; 64] = [
+pub const MASK: [u64; 64] = [
     0x1,
     0x2,
     0x4,

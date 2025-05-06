@@ -94,17 +94,17 @@ fn main() {
         let mut channel = TcpChannel::new(stream);
 
         let mut seed = [0u8; 32]; // debugging with seed 0 first
-        // let mut rng_seed = rand::thread_rng();
-        // rng_seed.fill(&mut seed);
+        let mut rng_seed = rand::thread_rng();
+        rng_seed.fill(&mut seed);
         let mut rng = ChaCha12Rng::from_seed(seed);
         channel.send_block::<32>(&[seed]).expect("Failed to send seed to sender");
 
         let origin = gen_origins(&mut rng, size);
         let mut data: Vec<[u128; DIMENSION]> = Vec::new();
 
-        // rng_seed.fill(&mut seed);
-        // rng = ChaCha12Rng::from_seed(seed);
-        seed = [1u8; 32];
+        rng_seed.fill(&mut seed);
+        rng = ChaCha12Rng::from_seed(seed);
+        // seed = [1u8; 32];
 
         origin.iter().for_each(|origin| {
             for i in 0..1 {
