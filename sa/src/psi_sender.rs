@@ -136,38 +136,57 @@ impl SAPSISender {
         for index in 0..self.table_size {
             let (origin, transformed_point) = cuckoo_table.query_table(index);
 
-            println!("Index: {}", index);
-            println!("Origin: {:?}", origin);
+            // println!("Index: {}", index);
+            // println!("Origin: {:?}", origin);
+            // println!("Transformed Point: {:?}", transformed_point);
             // println!("Compare Point: {:?}", compare_point);
 
             // Create set of indicating prefixes
-            let mut all_set_decompose: Vec<Vec<(u128, usize)>> = Vec::new();
+            let mut all_set_decompose: Vec<Vec<([u128; 2], [usize; 2])>> = Vec::new();
             for dim in 0..DIMENSION {
+                let mut decompose_set = HashSet::<([u128; 2], [usize; 2])>::new();
+
                 let upper = transformed_point[dim] + RADIUS as u128 + 1;
-                let set_decompose = set_decompose(upper);
-                if index == 41 {
-                    println!("Upper: {}, Decomposed: {:?}", upper, set_decompose);
-                }
-                all_set_decompose.push(set_decompose);
+                let upper_decompose = set_decompose(upper);
+                upper_decompose.iter().for_each(|(point, length)| {
+                    decompose_set.insert(([*point, (1 << *length) - 1 - *point], [*length, *length]));
+                });
+
+                let lower = (1 << RANGE_BITS) - 1 - transformed_point[dim] + RADIUS as u128 + 1;
+                let lower_decompose = set_decompose(lower);
+
+                lower_decompose.iter().for_each(|(point, length)| {
+                    decompose_set.insert(([(1 << *length) - 1 - *point, *point], [*length, *length]));
+                });
+                let decompose = decompose_set.into_iter().collect::<Vec<([u128; 2], [usize; 2])>>();
+
+                // println!("Decompose: {:?}", decompose);
+
+                all_set_decompose.push(decompose);
             }
-            let mut good_prefix = vec![([0u128; DIMENSION], [0usize; DIMENSION]); 1];
+
+            let mut good_prefix = vec![([0u128; DIMENSION2], [0usize; DIMENSION2]); 1];
             all_set_decompose.iter().enumerate().for_each(|(dim, set_decompose)| {
-                let mut new_good_prefix = Vec::<([u128; DIMENSION], [usize; DIMENSION])>::new();
+                let mut new_good_prefix = Vec::<([u128; DIMENSION2], [usize; DIMENSION2])>::new();
                 good_prefix.iter().for_each(|(pref, length_tuple)| {
                     let mut new_pref = *pref;
                     let mut new_length_tuple = *length_tuple;
                     set_decompose.iter().for_each(|(decompose, length)| {
-                        new_pref[dim] = *decompose;
-                        new_length_tuple[dim] = *length;
+                        new_pref[2 * dim..2 * dim + 2].copy_from_slice(decompose);
+                        new_length_tuple[2 * dim..2 * dim + 2].copy_from_slice(length);
                         new_good_prefix.push((new_pref, new_length_tuple));
                     });
                 });
                 good_prefix = new_good_prefix;
             });
 
+            if transformed_point == [0u128; DIMENSION] {
+                good_prefix.clear();
+            }
+
             // Now start DFS
             good_prefix.iter().for_each(|(pref, length)| {
-                // println!("Prefix: {:?}, Length: {:?}", pref, length);
+                // println!("Initial Search Prefix: {:?}, Length: {:?}", pref, length);
                 self.int_search(&idcf_table[index], index, &origin, &pref, &length, &hashes_set[index]);
             });
 
@@ -188,17 +207,20 @@ impl SAPSISender {
         println!("Intersection size: {}", self.intersection.len());
     }
 
-    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, origin: &[u128; DIMENSION], prefix: &[u128; DIMENSION], length: &[usize; DIMENSION], hashes: &HashSet<[u8; 32]>) {
-        if index == 41 {
-            println!("Current prefix: {:?}, Length: {:?}", prefix, length);
-        }
+    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, origin: &[u128; DIMENSION], prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 32]>) {
+        // println!("Current prefix: {:?}, Length: {:?}", prefix, length);
+        // I'm sure that each pair of 2i, 2i+1 prefix has the same length
         for i in 0..DIMENSION {
-            if !PREF_LENGTH.contains(&length[i]) {
+            if !PREF_LENGTH.contains(&length[2*i]) {
+                // println!("Brute more");
                 for b in 0..2 {
                     let mut new_prefix = prefix.clone();
                     let mut new_length = length.clone();
-                    new_prefix[i] = new_prefix[i] * 2 + b;
-                    new_length[i] += 1;
+                    new_prefix[2*i] = new_prefix[2*i] * 2 + b;
+                    new_prefix[2*i+1] = new_prefix[2*i+1] * 2 + 1 - b;
+                    new_length[2*i] += 1;
+                    new_length[2*i+1] += 1;
+                    // println!("Brute Old prefix: {:?}, New prefix: {:?}", prefix, new_prefix);
                     self.int_search(idcf_table, index, origin, &new_prefix, &new_length, hashes);
                 }
                 return;
@@ -210,12 +232,11 @@ impl SAPSISender {
         for i in 0..DIMENSION {
             to_be_hashed.extend_from_slice(&origin[i].to_le_bytes()); // Change to OPRF later
         }
-        for i in 0..DIMENSION {
+        for i in 0..DIMENSION2 {
             to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
         }
-        for i in 0..DIMENSION {
-            to_be_hashed.extend_from_slice(idcf_table[2 * i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
-            to_be_hashed.extend_from_slice(idcf_table[2 * i + 1][(1 << length[i]) - 1 + (1 << length[i]) - 1 - prefix[i] as usize].as_slice()); // check prefix length
+        for i in 0..DIMENSION2 {
+            to_be_hashed.extend_from_slice(idcf_table[i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
         }
         let hash1 = blake3::hash(&to_be_hashed);
         let mut hsh = [0u8; 32];
@@ -223,23 +244,32 @@ impl SAPSISender {
 
         // If the critical prefix hash is not in the hash set, prune
         if !hashes.contains(&hsh) {
-            println!("Prune");
+            // println!("Prune");
             return;
         }
 
-        if *length == [RANGE_BITS; DIMENSION] {
-            self.intersection.insert(*prefix);
-            println!("Intersection: Origin: {:?}, Point: {:?}", origin, prefix);
-            println!("Index: {}, Hash: {:?}", index, hsh);
+        if *length == [RANGE_BITS; DIMENSION2] {
+            let mut original_point = [0u128; DIMENSION];
+            for i in 0..DIMENSION {
+                original_point[i] = prefix[2*i] + origin[i];
+            }
+            self.intersection.insert(original_point);
+            return;
+            // println!("Intersection: Origin: {:?}, Point: {:?}", origin, prefix);
+            // println!("Index: {}, Hash: {:?}", index, hsh);
         }
 
         for i in 0..DIMENSION {
-            if length[i] < RANGE_BITS {
+            // println!("Search more");
+            if length[2*i] < RANGE_BITS {
                 for b in 0..2 {
                     let mut new_prefix = prefix.clone();
                     let mut new_length = length.clone();
-                    new_prefix[i] = new_prefix[i] * 2 + b;
-                    new_length[i] += 1;
+                    new_prefix[2*i] = new_prefix[2*i] * 2 + b;
+                    new_prefix[2*i+1] = new_prefix[2*i+1] * 2 + 1 - b;
+                    new_length[2*i] += 1;
+                    new_length[2*i+1] += 1;
+                    // println!("Search Old prefix: {:?}, New prefix: {:?}", prefix, new_prefix);
                     self.int_search(idcf_table, index, origin, &new_prefix, &new_length, hashes);
                 }
                 return;

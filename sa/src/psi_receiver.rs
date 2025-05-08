@@ -30,9 +30,9 @@ impl SAPSIReceiver {
         let mut processed_points: Vec<([u128; DIMENSION], [u128; DIMENSION])> = Vec::new();
         values.iter().for_each(|point| {
             let processed_point= preprocess_point(point);
-            processed_point.iter().for_each(|(origin, transformed_point)| {
-                println!("Origin: {:?}, Transformed Point: {:?}", origin, transformed_point);
-            });
+            // processed_point.iter().for_each(|(origin, transformed_point)| {
+            //     println!("Origin: {:?}, Transformed Point: {:?}", origin, transformed_point);
+            // });
             processed_points.extend_from_slice(processed_point.as_slice());
         });
 
@@ -43,16 +43,6 @@ impl SAPSIReceiver {
             let res: bool = simple_table.insert(origin, transformed_point);
             assert!(res, "Insertion failed");
         });
-
-        // print out the simple table
-        // for index in 0..self.table_size {
-        //     println!("Index: {}", index);
-        //     let points = simple_table.query_table(index);
-            // points.iter().for_each(|(origin, transformed_point)| {
-            //     println!("Origin: {:?}, Transformed Point: {:?}", origin, transformed_point);
-            // });
-            // println!("---------------------");
-        // }
 
         let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
 
@@ -127,7 +117,7 @@ impl SAPSIReceiver {
         let mut num_hashes = 0;
 
         for index in 0..self.table_size {
-            println!("Index: {}", index);
+            // println!("Index: {}", index);
             let points_set = simple_table.query_table(index);
             let mut hashes = HashSet::<[u8; 32]>::new();
             points_set.iter().for_each(|(origin, transformed_point)| {
@@ -145,6 +135,7 @@ impl SAPSIReceiver {
                     }
                     for i in 0..DIMENSION {
                         to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
+                        to_be_hashed.extend_from_slice(&((1 << length[i]) - 1 - prefix[i]).to_le_bytes());
                     }
                     for i in 0..DIMENSION {
                         to_be_hashed.extend_from_slice(idcf_table[index][2*i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
@@ -155,8 +146,8 @@ impl SAPSIReceiver {
                     hsh.copy_from_slice(hash1.as_bytes());
 
                     if *length == [RANGE_BITS; DIMENSION] {
-                        println!("Origin: {:?}, Point: {:?}", origin, prefix);
-                        println!("Hash: {:?}", hsh);
+                        // println!("Origin: {:?}, Point: {:?}", origin, prefix);
+                        // println!("Hash: {:?}", hsh);
                     }
 
                     hashes.insert(hsh);
@@ -165,7 +156,6 @@ impl SAPSIReceiver {
             hashes_set.push(hashes.clone());
             num_hashes += hashes.len();
             max_bin_size = max(max_bin_size, points_set.len());
-            println!();
         }
 
         println!("Max bin size: {}", max_bin_size);

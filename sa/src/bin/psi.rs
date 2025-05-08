@@ -81,15 +81,62 @@ fn main() {
             }
             data.push(point);
 
-            let mut point2 = [0u128; DIMENSION];
             for dim in 0..DIMENSION {
-                let x_bytes = channel.receive_block::<16>().expect("Failed to receive x bytes");
-                point2[dim] = u128::from_le_bytes(x_bytes[0]);
+                let mut x_bytes = [0u8; 16];
+                x_bytes.copy_from_slice(&point[dim].to_le_bytes());
+                channel.send_block::<16>(&[x_bytes]).expect("Failed to send x bytes");
             }
 
             // println!("Point 1: {:?}", point);
             // println!("Point 2: {:?}", point2);
 
+        });
+
+        let start = Instant::now();
+
+        let mut receiver_psi = SAPSIReceiver::new(size, table_size);
+        receiver_psi.receive(&mut channel, &data, &mut comm);
+
+        println!("Receiver finished in {:?}", start.elapsed());
+        println!("Total communication: {} bytes", comm);
+    } else if role == "sender" {
+        let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
+        let mut channel = TcpChannel::new(stream);
+
+        let mut seed = [2u8; 32]; // debugging with seed 0 first
+        let mut rng_seed = rand::thread_rng();
+        rng_seed.fill(&mut seed);
+        let mut rng = ChaCha12Rng::from_seed(seed);
+        channel.send_block::<32>(&[seed]).expect("Failed to send seed to sender");
+
+        let origin = gen_origins(&mut rng, size);
+        let mut data: Vec<[u128; DIMENSION]> = Vec::new();
+
+        seed = [1u8; 32];
+        rng_seed.fill(&mut seed);
+        rng = ChaCha12Rng::from_seed(seed);
+
+        let mut intersection_size = 0;
+
+        origin.iter().for_each(|origin| {
+            let mut point = gen_input(&mut rng);
+            point = gen_input(&mut rng);
+            for j in 0..DIMENSION {
+                point[j] = point[j] % (1 << RANGE_BITS);
+            }
+            // println!("Origin: {:?}, Point: {:?}", origin, point);
+            for j in 0..DIMENSION {
+                point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];
+            }
+            data.push(point);
+
+            // println!("Point: {:?}", point);
+
+            let mut point2 = [0u128; DIMENSION];
+            for dim in 0..DIMENSION {
+                let x_bytes = channel.receive_block::<16>().expect("Failed to receive x bytes");
+                point2[dim] = u128::from_le_bytes(x_bytes[0]);
+            }
             let mut in_range = true;
             for dim in 0..DIMENSION {
                 if (point2[dim] + (RADIUS as u128) < point[dim]) || (point2[dim] > point[dim] + (RADIUS as u128)) {
@@ -107,56 +154,11 @@ fn main() {
                 for dim in 0..DIMENSION {
                     recentered_point2[dim] = point2[dim] - origin[dim];
                 }
-                println!("Intersection: Origin: {:?}, Point: {:?}, Point2: {:?}", origin, recentered_point, recentered_point2);
+                // println!("Intersection: Origin: {:?}, Point: {:?}, Point2: {:?}", origin, recentered_point, recentered_point2);
             }
         });
 
         println!("Intersection size: {}", intersection_size);
-
-        let start = Instant::now();
-
-        let mut receiver_psi = SAPSIReceiver::new(size, table_size);
-        receiver_psi.receive(&mut channel, &data, &mut comm);
-
-        println!("Receiver finished in {:?}", start.elapsed());
-        println!("Total communication: {} bytes", comm);
-    } else if role == "sender" {
-        let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
-        let mut channel = TcpChannel::new(stream);
-
-        let mut seed = [2u8; 32]; // debugging with seed 0 first
-        // let mut rng_seed = rand::thread_rng();
-        // rng_seed.fill(&mut seed);
-        let mut rng = ChaCha12Rng::from_seed(seed);
-        channel.send_block::<32>(&[seed]).expect("Failed to send seed to sender");
-
-        let origin = gen_origins(&mut rng, size);
-        let mut data: Vec<[u128; DIMENSION]> = Vec::new();
-
-        seed = [1u8; 32];
-        // rng_seed.fill(&mut seed);
-        rng = ChaCha12Rng::from_seed(seed);
-
-        origin.iter().for_each(|origin| {
-            let mut point = gen_input(&mut rng);
-            point = gen_input(&mut rng);
-            for j in 0..DIMENSION {
-                point[j] = point[j] % (1 << RANGE_BITS);
-            }
-            // println!("Origin: {:?}, Point: {:?}", origin, point);
-            for j in 0..DIMENSION {
-                point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];
-            }
-            data.push(point);
-
-            // println!("Point: {:?}", point);
-
-            for dim in 0..DIMENSION {
-                let mut x_bytes = [0u8; 16];
-                x_bytes.copy_from_slice(&point[dim].to_le_bytes());
-                channel.send_block::<16>(&[x_bytes]).expect("Failed to send x bytes");
-            }
-        });
 
         let start = Instant::now();
 
