@@ -27,14 +27,17 @@ impl SAPSIReceiver {
     }
 
     pub fn receive<IO: CommunicationChannel>(&self, io: &mut IO, values: &[[u128; DIMENSION]], comm: &mut u64) {
-        let mut processed_points: Vec<([u128; DIMENSION2], [u128; DIMENSION2])> = Vec::new();
+        let mut processed_points: Vec<([u128; DIMENSION], [u128; DIMENSION])> = Vec::new();
         values.iter().for_each(|point| {
             let processed_point= preprocess_point(point);
+            processed_point.iter().for_each(|(origin, transformed_point)| {
+                println!("Origin: {:?}, Transformed Point: {:?}", origin, transformed_point);
+            });
             processed_points.extend_from_slice(processed_point.as_slice());
         });
 
 
-        let mut simple_table = SimpleHash::<DIMENSION2>::new(self.table_size, 100000, LOC_FUNC_COUNT);
+        let mut simple_table = SimpleHash::<DIMENSION>::new(self.table_size, 100000, LOC_FUNC_COUNT);
         simple_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
         processed_points.iter().for_each(|(origin, transformed_point)| {
             let res: bool = simple_table.insert(origin, transformed_point);
@@ -83,9 +86,14 @@ impl SAPSIReceiver {
         let mut idcf_sender = IDCFSender::new(depth, times);
         for index in 0..self.table_size {
             idcf_table.push(Vec::new());
-            for dim in 0..DIMENSION2 {
+            for dim in 0..DIMENSION {
                 let mut idcf_sharing = vec![[0u8; 16]; 1 << (RANGE_BITS + 1)];
-                let idcf_time = 2 * index * DIMENSION + dim;
+                let idcf_time = 2 * (index * DIMENSION + dim);
+                idcf_sender.compute(&mut idcf_sharing, key[idcf_time], beta[idcf_time], idcf_time);
+                idcf_table[index].push(idcf_sharing);
+
+                idcf_sharing = vec![[0u8; 16]; 1 << (RANGE_BITS + 1)];
+                let idcf_time = 2 * (index * DIMENSION + dim) + 1;
                 idcf_sender.compute(&mut idcf_sharing, key[idcf_time], beta[idcf_time], idcf_time);
                 idcf_table[index].push(idcf_sharing);
             }
@@ -119,10 +127,10 @@ impl SAPSIReceiver {
         let mut num_hashes = 0;
 
         for index in 0..self.table_size {
-            // println!("Index: {}", index);
+            println!("Index: {}", index);
             let points_set = simple_table.query_table(index);
             let mut hashes = HashSet::<[u8; 32]>::new();
-            points_set.iter().for_each(|(_origin, transformed_point)| {
+            points_set.iter().for_each(|(origin, transformed_point)| {
                 let prefixes_and_lengths = get_prefixes(transformed_point);
 
                 // println!("Transformed Point: {:?}", transformed_point);
@@ -132,32 +140,32 @@ impl SAPSIReceiver {
                     // Get the corresponding hash
                     let mut to_be_hashed = Vec::<u8>::new();
                     to_be_hashed.extend_from_slice(&index.to_le_bytes());
-                    for i in 0..DIMENSION2 {
+                    for i in 0..DIMENSION {
+                        to_be_hashed.extend_from_slice(&origin[i].to_le_bytes()); // Change to OPRF later
+                    }
+                    for i in 0..DIMENSION {
                         to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
                     }
-                    for i in 0..DIMENSION2 {
-                        to_be_hashed.extend_from_slice(idcf_table[index][i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
+                    for i in 0..DIMENSION {
+                        to_be_hashed.extend_from_slice(idcf_table[index][2*i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
+                        to_be_hashed.extend_from_slice(idcf_table[index][2*i+1][(1 << length[i]) - 1 + (1 << length[i]) - 1 - prefix[i] as usize].as_slice()); // check prefix length
                     }
-                    // let mut hasher= Blake2s256::new();
-                    // hasher.update(&to_be_hashed);
-                    // let start = Instant::now();
                     let hash1 = blake3::hash(&to_be_hashed);
-                    // println!("Hashing time: {:?}", start.elapsed());
                     let mut hsh = [0u8; 32];
-                    // hsh.copy_from_slice(&hasher.finalize());
                     hsh.copy_from_slice(hash1.as_bytes());
-                    hashes.insert(hsh);
 
-                    // if index == 27 && transformed_point == &[39, 24, 16, 47] {
-                    //     println!("Prefix: {:?}, Length: {:?}", prefix, length);
-                    //     println!("To be hashed: {:?}", to_be_hashed);
-                    //     println!("Hash: {:?}", hsh);
-                    // }
+                    if *length == [RANGE_BITS; DIMENSION] {
+                        println!("Origin: {:?}, Point: {:?}", origin, prefix);
+                        println!("Hash: {:?}", hsh);
+                    }
+
+                    hashes.insert(hsh);
                 });
             });
             hashes_set.push(hashes.clone());
             num_hashes += hashes.len();
             max_bin_size = max(max_bin_size, points_set.len());
+            println!();
         }
 
         println!("Max bin size: {}", max_bin_size);
@@ -196,26 +204,23 @@ impl SAPSIReceiver {
     }
 }
 
-fn preprocess_point(point: &[u128; DIMENSION]) -> Vec<([u128; DIMENSION2], [u128; DIMENSION2])> {
-    let mut result = Vec::<([u128; DIMENSION2], [u128; DIMENSION2])>::new();
-    let mut grid_origin = [0u128; DIMENSION2];
+fn preprocess_point(point: &[u128; DIMENSION]) -> Vec<([u128; DIMENSION], [u128; DIMENSION])> {
+    let mut result = Vec::<([u128; DIMENSION], [u128; DIMENSION])>::new();
+    let mut grid_origin = [0u128; DIMENSION];
     for i in 0..DIMENSION {
-        grid_origin[2 * i] = (point[i] >> (RANGE_BITS - 1)) << (RANGE_BITS - 1);
-        grid_origin[2 * i + 1] = grid_origin[2 * i];
+        grid_origin[i] = (point[i] >> (RANGE_BITS - 1)) << (RANGE_BITS - 1);
     }
 
     for mask in 0..(1 << DIMENSION) {
         let mut universe_origin= grid_origin.clone();
         for i in 0..DIMENSION {
             if (mask >> i) & 1 == 1 {
-                universe_origin[2 * i] -= (1 << (RANGE_BITS - 1));
-                universe_origin[2 * i + 1] -= (1 << (RANGE_BITS - 1));
+                universe_origin[i] -= (1 << (RANGE_BITS - 1));
             }
         }
-        let mut transformed_point = [0u128; DIMENSION2];
+        let mut transformed_point = [0u128; DIMENSION];
         for i in 0..DIMENSION {
-            transformed_point[2 * i] = point[i] - universe_origin[2 * i];
-            transformed_point[2 * i + 1] = (1 << RANGE_BITS) - 1 - (point[i] - universe_origin[2 * i + 1]);
+            transformed_point[i] = point[i] - universe_origin[i];
         }
 
         result.push((universe_origin, transformed_point));
@@ -223,11 +228,11 @@ fn preprocess_point(point: &[u128; DIMENSION]) -> Vec<([u128; DIMENSION2], [u128
     result
 }
 
-fn get_prefixes(point: &[u128; DIMENSION2]) -> Vec<([u128; DIMENSION2], [usize; DIMENSION2])> {
+fn get_prefixes(point: &[u128; DIMENSION]) -> Vec<([u128; DIMENSION], [usize; DIMENSION])> {
     // println!("Point: {:?}", point);
-    let mut prefixes_and_lengths = vec![(*point, [RANGE_BITS; DIMENSION2])];
-    for i in 0..DIMENSION2 {
-        let mut new_prefixes_and_lengths = Vec::<([u128; DIMENSION2], [usize; DIMENSION2])>::new();
+    let mut prefixes_and_lengths = vec![(*point, [RANGE_BITS; DIMENSION])];
+    for i in 0..DIMENSION {
+        let mut new_prefixes_and_lengths = Vec::<([u128; DIMENSION], [usize; DIMENSION])>::new();
         prefixes_and_lengths.iter().for_each(|(prefix, length)| {
             let mut new_prefix = prefix.clone();
             let mut new_length = length.clone();

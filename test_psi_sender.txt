@@ -1,0 +1,696 @@
+loc_funcs: [[102, 233, 75, 212, 239, 138, 44, 59, 136, 76, 250, 89, 202, 52, 43, 46], [12, 84, 111, 98, 191, 39, 115, 205, 15, 86, 79, 206, 202, 123, 166, 136], [194, 18, 11, 205, 73, 237, 169, 162, 136, 179, 180, 190, 121, 172, 129, 88]]
+Times: 228
+Sender computed IDCF in 759.341µs
+Index: 0
+Origin: [206582760690918170295214453728413203136, 98799490999245389573177960263811125856]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 1
+Origin: [4468981577522073184995048911134369760, 50478425628806543050716763939147857344]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 2
+Origin: [102634770523303637369647352826147876224, 71259774791587695682641931735021954112]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 3
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 4
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 5
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 6
+Origin: [308479789354052801713795603423387933568, 301587470920516976797733898832703810624]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 7
+Origin: [142541262564340028422994048807070721536, 76521491972844325229177078146940498400]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 8
+Origin: [73693881455959987975731268951113584480, 3973661195625400124895450311481670944]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 9
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 10
+Origin: [227642810157963941110553694977330248064, 260656706215766876372371036253223399616]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 11
+Origin: [108080665056630551522332096644988571296, 147247463278684718955575429642376194656]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 12
+Origin: [7776468797216592419182562505850636384, 117851689742518977510669179046629775776]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 13
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 14
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 15
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 16
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 17
+Origin: [242981820720376034903710203805572052640, 265765339764416683800098814571301186016]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 18
+Origin: [302403944424807483192399626777118973600, 167751585825474161536165082446043200544]
+Prune
+Prune
+Prune
+Prune
+Index: 19
+Origin: [287286573782175682656037607822534639616, 259205000751928077868141412704754437344]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 20
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 21
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 22
+Origin: [340144428969242431076158938681267206912, 308692997013001910282449495053878868672]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 23
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 24
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 25
+Origin: [60518111765752817854401234193076077920, 302403294919105524147108894559139366080]
+Prune
+Index: 26
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 27
+Origin: [291772386904276190071199692247242681760, 224810420772501900332304485858706753856]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 28
+Origin: [36063017713357443652983963320548826048, 241577018274084801850392939917821010560]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 29
+Origin: [299405408926674807493953258967467338336, 108095872854205281368109147337856425312]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 30
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 31
+Origin: [246744515963806694276039790864081052992, 155069022594440102467469378383291361600]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 32
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 33
+Origin: [17955749891949777934436970115262596384, 120797161564713049939572899746910455936]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 34
+Origin: [92296572361622187759524961020250159968, 102387163262175097348020473712183151840]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 35
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 36
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 37
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 38
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 39
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 40
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 41
+Origin: [73641451329308029542889764211126272832, 89235942391877093851592007760816041920]
+Upper: 35, Decomposed: [(34, 6), (16, 5), (0, 1)]
+Upper: 48, Decomposed: [(2, 2), (0, 1)]
+Current prefix: [34, 2], Length: [6, 2]
+Prune
+Current prefix: [34, 0], Length: [6, 1]
+Prune
+Current prefix: [16, 2], Length: [5, 2]
+Prune
+Current prefix: [16, 0], Length: [5, 1]
+Prune
+Current prefix: [0, 2], Length: [1, 2]
+Prune
+Current prefix: [0, 0], Length: [1, 1]
+Prune
+Index: 42
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 43
+Origin: [166042485432676336605053333280637972512, 266603096370045963927882922835681035424]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 44
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 45
+Origin: [299851238434088416604644702916717977216, 1502398400088671188841552779507090528]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 46
+Origin: [85637491937808505245104468069020720992, 241732737868260411318729519763869498688]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 47
+Origin: [241627242397223184305741709916455328928, 140980168221720024929482291003214526048]
+Prune
+Prune
+Prune
+Index: 48
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 49
+Origin: [836439293621327212815644066170874080, 257834478515928113816387367340611733248]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 50
+Origin: [9383222244965678358133980080804222112, 301323461778660520740904698861014886304]
+Prune
+Prune
+Prune
+Index: 51
+Origin: [120317563838695962935132969310163905760, 106941589382695817576162047291705951904]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 52
+Origin: [65845323671172014041260098988235949344, 172020476955929994253446424494955715200]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 53
+Origin: [62294421657852343598081773805337854752, 95600217177087496620316594108572131776]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 54
+Origin: [151761582711730672645367857312328301568, 89960593545219874213676520054020676416]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 55
+Origin: [0, 0]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Index: 56
+Origin: [149759579022585716245120631838421760064, 236353107004473429635589980450134458976]
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Prune
+Sender computed intersection in 1.18075ms
+Intersection size: 0
+Sender finished in 110.748251ms
+Total communication: 37129 bytes

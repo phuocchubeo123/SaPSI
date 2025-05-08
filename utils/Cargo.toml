@@ -1,0 +1,7 @@
+[package]
+name = "psi-utils"
+version = "0.1.0"
+
+[lib]
+name = "psi_utils"
+path = "src/lib.rs"

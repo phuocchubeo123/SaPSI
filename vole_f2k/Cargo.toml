@@ -1,0 +1,18 @@
+[package]
+name = "psi-volef2k"
+version = "0.1.0"
+
+[lib]
+name = "psi_volef2k"
+path = "src/lib.rs"
+
+[dependencies]
+psi-network = { workspace = true }
+psi-ot = { workspace = true }
+psi-aes = { workspace = true }
+psi-utils = { workspace = true }
+blake3 = "1.8.2"
+rand = "0.8"
+
+[[bin]]
+name = "test_spfss_f2k"
