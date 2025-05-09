@@ -2,6 +2,10 @@
 name = "psi-okvs"
 version = "0.1.0"
 
+[lib]
+name = "psi_okvs"
+path = "src/lib.rs"
+
 [dependencies]
 psi-aes = { workspace = true }
 lambdaworks_math = { git = "https://github.com/lambdaclass/lambdaworks.git", package = "lambdaworks-math" }
@@ -19,3 +23,6 @@ parallel = ["dep:rayon"]
 
 [[bin]]
 name = "test_rb_okvs"
+
+[[bin]]
+name = "test_rb_okvs_f2k"

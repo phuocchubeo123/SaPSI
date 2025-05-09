@@ -6,16 +6,16 @@ use std::ops::{BitXor, Shl, Shr};
 use sp_core::U256;
 use blake3;
 
-const EPSILON: f64 = 1.0; // can change
-const BAND_WIDTH: usize = 80; // can change
-pub struct RbOkvsF2 {
+const EPSILON: f64 = 1.5; // can change
+const BAND_WIDTH: usize = 200; // can change
+pub struct RbOkvsF2k {
     pub columns: usize,
     band_width: usize,
     r1: [u8; 16],
     r2: [u8; 16],
 }
 
-impl RbOkvsF2 {
+impl RbOkvsF2k {
     pub fn new(kv_count: usize, r1: &[u8; 16], r2: &[u8; 16]) -> Self {
         let columns = ((1.0 + EPSILON) * kv_count as f64) as usize;
 
@@ -33,13 +33,39 @@ impl RbOkvsF2 {
 
     pub fn encode(&self, input: &Vec<Pair<u128, u128>>) -> Result<Vec<u128>> {
         let (matrix, start_pos, y) = self.create_sorted_matrix(input)?;
-        self.simple_gauss(y, matrix, start_pos, self.columns, self.band_width)
+        self.simple_gauss(y, matrix, start_pos, self.band_width)
+    }
+
+    pub fn decode(&self, encoding: &Vec<u128>, key: &[u128]) -> Vec<u128> {
+        let n = key.len();
+        let mut start = vec![0usize; n];
+        let mut band = vec![U256::default(); n];
+
+        start.iter_mut().enumerate().for_each(|(i, start_i)| {
+            *start_i = hash_to_index(key[i], &self.r1, self.columns - self.band_width);
+        });
+
+        band.iter_mut().enumerate().for_each(|(i, band_i)| {
+            *band_i = hash_to_band(key[i], &self.r2);
+        });
+
+        let mut res = vec![0; n];
+
+        for i in 0..n {
+            for j in 0..self.band_width {
+                if band[i].0[j / 64] & MASK[j & 63] != 0 {
+                    res[i] ^= encoding[start[i] + j];
+                }
+            }
+        }
+
+        res
     }
 
     fn create_sorted_matrix(&self, input: &Vec<Pair<u128, u128>>) -> Result<(Vec<U256>, Vec<usize>, Vec<u128>)> {
         let n = input.len();
         let mut start_pos: Vec<(usize, usize)> = vec![(0, 0); n];
-        let mut matrix: Vec<U256> = vec![U256::default(); n * self.band_width];
+        let mut matrix: Vec<U256> = vec![U256::default(); n];
         let mut start_ids: Vec<usize> = vec![0; n];
         let mut y: Vec<u128> = vec![0; n];
 
@@ -69,7 +95,6 @@ impl RbOkvsF2 {
         mut y: Vec<u128>,
         mut bands: Vec<U256>,
         start_pos: Vec<usize>,
-        cols: usize,
         band_width: usize,
     ) -> Result<Vec<u128>> {
         let rows = bands.len();
@@ -77,8 +102,7 @@ impl RbOkvsF2 {
         assert_eq!(rows, start_pos.len());
         assert_eq!(rows, y.len());
 
-        let mut pivot = vec![0 as usize; rows];
-        let mut first_nonzero = vec![band_width; rows];
+        let mut bands_bool = vec![vec![false; band_width]; rows];
 
         for i in 0..rows {
             for j in 0..4 {
@@ -86,15 +110,22 @@ impl RbOkvsF2 {
                     if j * 64 + k >= band_width {
                         break;
                     }
-                    let mut found_nonzero = false;
                     if bands[i].0[j] & MASK[k] != 0 {
-                        first_nonzero[i] = j * 64 + k;
-                        found_nonzero = true;
-                        break;
+                        bands_bool[i][j * 64 + k] = true;
                     }
-                    if found_nonzero {
-                        break;
-                    }
+                }
+            }
+        }
+
+        let mut pivot = vec![0 as usize; rows];
+        let mut first_nonzero = vec![band_width; rows];
+
+        for i in 0..rows {
+            let y_i = y[i];
+            for j in 0..band_width {
+                if bands_bool[i][j] {
+                    first_nonzero[i] = j;
+                    break;
                 }
             }
 
@@ -103,29 +134,37 @@ impl RbOkvsF2 {
             }
 
             pivot[i] = first_nonzero[i] + start_pos[i];
-            let bands_i = bands[i].clone();
+
+            let bands_bool_i = bands_bool[i].clone();   
 
             for j in (i + 1)..rows {
                 if start_pos[j] > pivot[i] {
                     break;
                 }
                 let offset = pivot[i] - start_pos[j];
-                if bands[j].0[offset / 64] & MASK[offset & 63] != 0 {
-                    let new_bands_j = bands[j].shl(offset).bitxor(bands_i.shl(first_nonzero[i]));
-                    bands[j] = bands[j].bitxor(bands[j].shl(offset).shr(offset)).bitxor(new_bands_j);
+                println!("offset: {}", offset);
+                let lead = bands_bool[j][offset];
+                if lead {
+                    for k in 0..(band_width - first_nonzero[i]) {
+                        bands_bool[j][k + offset] ^= bands_bool_i[k + first_nonzero[i]];
+                    }
+                    y[j] ^= y_i;
                 }
-                y[j] = y[j] ^ y[i];
+
             }
         }
 
-        let mut x = vec![0; rows];
+        println!("bands: {:?}", bands);
+
+        let mut x = vec![0; self.columns];
         for i in (0..rows).rev() {
             let mut res = y[i];   
             for j in 0..band_width {
-                if bands[i].0[j / 64] & MASK[j & 63] != 0 {
-                    res = res ^ x[start_pos[i] + j];
+                if bands_bool[i][j] {
+                    res ^= x[start_pos[i] + j];
                 }
             }
+            x[pivot[i]] = res;
         }
 
         Ok(x)

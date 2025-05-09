@@ -49,8 +49,6 @@ pub fn simple_gauss(
 
     assert_eq!(rows, start_pos.len());
     assert_eq!(rows, y.len());
-    let mut pivot = vec![0 as usize; rows];
-
     let mut bands_FE = vec![vec![FE::zero(); band_width]; rows];
 
     for i in 0..rows {
@@ -66,6 +64,7 @@ pub fn simple_gauss(
         }
     }
 
+    let mut pivot = vec![0 as usize; rows];
     let mut first_nonzero = vec![band_width; rows];
     let mut skip_num = 0;
 

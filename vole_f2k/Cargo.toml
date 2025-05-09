@@ -11,6 +11,7 @@ psi-network = { workspace = true }
 psi-ot = { workspace = true }
 psi-aes = { workspace = true }
 psi-utils = { workspace = true }
+psi-okvs = { workspace = true }
 blake3 = "1.8.2"
 rand = "0.8"
 
@@ -25,3 +26,6 @@ name = "test_mpfss_f2k"
 
 [[bin]]
 name = "test_base_svole_f2k"
+
+[[bin]]
+name = "test_vole_triple_f2k"
