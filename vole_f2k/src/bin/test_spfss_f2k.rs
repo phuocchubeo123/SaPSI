@@ -12,14 +12,8 @@ use psi_network::socket_channel::TcpChannel;
 use psi_network::comm_channel::CommunicationChannel;
 use psi_volef2k::spfss_sender_f2k::SpfssSenderF2k;
 use psi_volef2k::spfss_receiver_f2k::SpfssRecverF2k;
-use rand::{RngCore, random};
-
-fn rand_u128() -> u128 {
-    let mut rng = rand::thread_rng();
-    let mut bytes = [0u8; 16];
-    rng.fill_bytes(&mut bytes);
-    u128::from_le_bytes(bytes)
-}
+use psi_volef2k::utils_f2k::rand_u128;
+use rand::RngCore;
 
 fn main() {
     let role = std::env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
@@ -70,7 +64,7 @@ fn main() {
             let mut receiver_spfss_f2k = SpfssRecverF2k::new(depth);
             receiver_spfss_f2k.recv(&mut channel, &mut receiver_pre_ot, i, &mut comm);
             receiver_spfss_f2k.compute(&mut ggm_tree_mem, delta2);
-            // receiver_spfss_f2k.consistency_check(&mut channel, delta2, beta, &mut comm);
+            receiver_spfss_f2k.consistency_check(&mut channel, ggm_tree_mem[(1 << (depth - 1)) - 1], beta, &mut comm);
         }
     } else if role == "sender" {
         // Connect to the receiver
@@ -112,6 +106,7 @@ fn main() {
             let mut sender_spfss_f2k = SpfssSenderF2k::new(depth);
             sender_spfss_f2k.compute(&mut ggm_tree_mem, delta, gamma);
             sender_spfss_f2k.send(&mut channel, &mut sender_pre_ot, i, &mut comm);
+            sender_spfss_f2k.consistency_check(&mut channel, ggm_tree_mem[0], &mut comm);
             channel.flush();
         }
 

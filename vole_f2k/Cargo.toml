@@ -16,3 +16,12 @@ rand = "0.8"
 
 [[bin]]
 name = "test_spfss_f2k"
+
+[[bin]]
+name = "test_cope_f2k"
+
+[[bin]]
+name = "test_mpfss_f2k"
+
+[[bin]]
+name = "test_base_svole_f2k"

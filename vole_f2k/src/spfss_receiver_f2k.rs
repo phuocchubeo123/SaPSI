@@ -61,7 +61,7 @@ impl SpfssRecverF2k {
         }
 
         nodes_sum ^= self.share;
-        self.share = nodes_sum ^ delta2;
+        self.ggm_tree[self.choice_pos] = delta2 ^ nodes_sum;
 
         ggm_tree_mem.copy_from_slice(&self.ggm_tree);
     }

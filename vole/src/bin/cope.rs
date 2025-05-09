@@ -10,7 +10,6 @@ use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
 use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark252PrimeField;
 use lambdaworks_math::field::element::FieldElement;
-use lambdaworks_math::unsigned_integer::element::UnsignedInteger;
 use lambdaworks_math::field::traits::IsPrimeField;
 
 pub type F = Stark252PrimeField;
