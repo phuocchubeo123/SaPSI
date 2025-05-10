@@ -154,7 +154,6 @@ impl OprfReceiver {
         let mut hws = FE::zero();
         hws = io.receive_stark252().expect("Failed to receive H(ws) from the sender")[0];
 
-
         // Running Vole
         // c = b + a * delta
         let start = Instant::now();

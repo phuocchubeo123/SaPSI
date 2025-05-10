@@ -6,7 +6,7 @@ use std::ops::{BitXor, Shl, Shr};
 use sp_core::U256;
 use blake3;
 
-const EPSILON: f64 = 1.5; // can change
+const EPSILON: f64 = 1.0; // can change
 const BAND_WIDTH: usize = 200; // can change
 pub struct RbOkvsF2k {
     pub columns: usize,
@@ -49,6 +49,9 @@ impl RbOkvsF2k {
             *band_i = hash_to_band(key[i], &self.r2);
         });
 
+        println!("Band: {:?}", &band[..5]);
+        println!("Start: {:?}", &start[..5]);
+
         let mut res = vec![0; n];
 
         for i in 0..n {
@@ -73,11 +76,17 @@ impl RbOkvsF2k {
             *start_pos_i = (i, hash_to_index(input[i].0, &self.r1, self.columns - self.band_width));
         });
 
+        println!("Start pos: {:?}", &start_pos[..5]);
+
         radix_sort(&mut start_pos, self.columns - self.band_width - 1);
 
+        println!("Start pos: {:?}", &start_pos[..5]);
+
+
         matrix.iter_mut().enumerate().for_each(|(i, matrix_i)| {
-            *matrix_i = hash_to_band(input[i].0, &self.r2);
+            *matrix_i = hash_to_band(input[start_pos[i].0].0, &self.r2);
         });
+
 
         y.iter_mut().enumerate().for_each(|(i, y_i)| {
             *y_i = input[start_pos[i].0].1.to_owned();
@@ -142,7 +151,6 @@ impl RbOkvsF2k {
                     break;
                 }
                 let offset = pivot[i] - start_pos[j];
-                println!("offset: {}", offset);
                 let lead = bands_bool[j][offset];
                 if lead {
                     for k in 0..(band_width - first_nonzero[i]) {
@@ -154,8 +162,6 @@ impl RbOkvsF2k {
             }
         }
 
-        println!("bands: {:?}", bands);
-
         let mut x = vec![0; self.columns];
         for i in (0..rows).rev() {
             let mut res = y[i];   
@@ -165,6 +171,16 @@ impl RbOkvsF2k {
                 }
             }
             x[pivot[i]] = res;
+        }
+
+        for i in 0..rows {
+            let mut res = 0;
+            for j in 0..band_width {
+                if bands_bool[i][j] {
+                    res ^= x[start_pos[i] + j];
+                }
+            }
+            assert_eq!(res, y[i], "Error in decoding");
         }
 
         Ok(x)

@@ -38,8 +38,8 @@ fn main() {
     }
 
     let keys = inputs.iter().map(|x| x.0.clone()).collect::<Vec<u128>>();
-
     let decoded = okvs.decode(&u, &keys);
+
 
     for i in 0..size {
         assert_eq!(inputs[i].1, decoded[i], "Mismatch at index {}", i);
