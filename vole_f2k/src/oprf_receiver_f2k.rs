@@ -5,15 +5,17 @@ use psi_okvs::types::Pair;
 use psi_aes::prg::PRG;
 use blake3;
 use std::time::Instant;
+use std::collections::HashMap;
 
-pub struct OprfReceiverF2k {
+pub struct OprfReceiverF2k<const KEY_DIM: usize> {
     n: usize,
     vole_receiver: VoleTripleF2k,
-    okvs: RbOkvsF2k,
+    okvs: RbOkvsF2k<KEY_DIM>,
     P: Vec<u128>,
+    outputs: HashMap<[u128; KEY_DIM], [u8; 32]>,
 }
 
-impl OprfReceiverF2k {
+impl<const KEY_DIM: usize> OprfReceiverF2k<KEY_DIM> {
     pub fn new<IO: CommunicationChannel>(io: &mut IO, n: usize, param: PrimalLPNParameterF2k, comm: &mut u64) -> Self {
         // Setup OKVS seed
         let mut prg = PRG::new(None, 0);
@@ -21,7 +23,7 @@ impl OprfReceiverF2k {
         prg.random_16byte_block(&mut r);
         let r1 = r[0];
         let r2 = r[1];
-        let okvs = RbOkvsF2k::new(n, &r1, &r2);
+        let okvs = RbOkvsF2k::<KEY_DIM>::new(n, &r1, &r2);
         io.send_block::<16>(&r);
 
         let mut vole_triple = VoleTripleF2k::new(1, true, io, param, comm);
@@ -33,28 +35,33 @@ impl OprfReceiverF2k {
             vole_receiver: vole_triple,
             okvs,
             P: vec![0; 2*n],
+            outputs: HashMap::new(),
         }
     }
 
-    pub fn receive<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[u128], comm: &mut u64) {
+    pub fn receive<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[[u128; KEY_DIM]], comm: &mut u64) {
         let hashes = values.iter().map(|x| {
-            let hash = blake3::hash(&x.to_le_bytes());
+            let mut hash = blake3::Hasher::new();
+            x.iter().for_each(|&x| {
+                hash.update(&x.to_le_bytes());
+            });
             let mut h = [0u8; 16];
-            h.copy_from_slice(&hash.as_bytes()[0..16]);
+            h.copy_from_slice(&hash.finalize().as_bytes()[0..16]);
             u128::from_le_bytes(h)
         }).collect::<Vec<u128>>();
 
-        let input_kv = values.iter().zip(hashes.iter()).map(|(x, h)| (*x, *h)).collect::<Vec<Pair<u128, u128>>>();
+        let input_kv = values.iter().zip(hashes.iter()).map(|(x, h)| (*x, *h)).collect::<Vec<Pair<[u128; KEY_DIM], u128>>>();
         self.P = self.okvs.encode(&input_kv).expect("Failed to encode using OKVS");
 
         let hws= io.receive_block::<32>().expect("Failed to receive H(ws) from the sender")[0];
 
         // Running Vole
         // c = b + a * delta
+        println!("Number of vole: {}", self.okvs.columns);
         let start = Instant::now();
-        let mut a = vec![0u128; self.P.len()];
-        let mut c = vec![0u128; self.P.len()];    
-        self.vole_receiver.extend(io, &mut c, &mut a, self.P.len(), comm);
+        let mut a = vec![0u128; self.okvs.columns];
+        let mut c = vec![0u128; self.okvs.columns];    
+        self.vole_receiver.extend(io, &mut c, &mut a, self.okvs.columns, comm);
 
         println!("Doing VOLE took {:?}", start.elapsed());
 
@@ -91,7 +98,9 @@ impl OprfReceiverF2k {
 
         let receiver_outputs = values.iter().zip(o.iter()).map(|(x, o)| {
             let mut to_be_hashed = Vec::<u8>::new();
-            to_be_hashed.extend_from_slice(&x.to_le_bytes());
+            x.iter().for_each(|&x| {
+                to_be_hashed.extend_from_slice(&x.to_le_bytes());
+            });
             to_be_hashed.extend_from_slice(&o.to_le_bytes());
             let hash = blake3::hash(&to_be_hashed);
             let mut hash_bytes = [0u8; 32];
@@ -99,6 +108,12 @@ impl OprfReceiverF2k {
             hash_bytes
         }).collect::<Vec<_>>();
 
-        // TODO
+        values.iter().zip(receiver_outputs.iter()).for_each(|(x, o)| {
+            self.outputs.insert(*x, *o);
+        });
+    }
+
+    pub fn get_output(&self, x: &[u128; KEY_DIM]) -> Option<[u8; 32]> {
+        self.outputs.get(x).copied()
     }
 }

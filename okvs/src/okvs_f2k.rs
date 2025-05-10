@@ -8,14 +8,14 @@ use blake3;
 
 const EPSILON: f64 = 1.0; // can change
 const BAND_WIDTH: usize = 200; // can change
-pub struct RbOkvsF2k {
+pub struct RbOkvsF2k<const KEY_DIM: usize> {
     pub columns: usize,
     band_width: usize,
     r1: [u8; 16],
     r2: [u8; 16],
 }
 
-impl RbOkvsF2k {
+impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
     pub fn new(kv_count: usize, r1: &[u8; 16], r2: &[u8; 16]) -> Self {
         let columns = ((1.0 + EPSILON) * kv_count as f64) as usize;
 
@@ -31,26 +31,23 @@ impl RbOkvsF2k {
         }
     }
 
-    pub fn encode(&self, input: &Vec<Pair<u128, u128>>) -> Result<Vec<u128>> {
+    pub fn encode(&self, input: &Vec<Pair<[u128; KEY_DIM], u128>>) -> Result<Vec<u128>> {
         let (matrix, start_pos, y) = self.create_sorted_matrix(input)?;
         self.simple_gauss(y, matrix, start_pos, self.band_width)
     }
 
-    pub fn decode(&self, encoding: &Vec<u128>, key: &[u128]) -> Vec<u128> {
+    pub fn decode(&self, encoding: &Vec<u128>, key: &[[u128; KEY_DIM]]) -> Vec<u128> {
         let n = key.len();
         let mut start = vec![0usize; n];
         let mut band = vec![U256::default(); n];
 
         start.iter_mut().enumerate().for_each(|(i, start_i)| {
-            *start_i = hash_to_index(key[i], &self.r1, self.columns - self.band_width);
+            *start_i = self.hash_to_index(&key[i], &self.r1, self.columns - self.band_width);
         });
 
         band.iter_mut().enumerate().for_each(|(i, band_i)| {
-            *band_i = hash_to_band(key[i], &self.r2);
+            *band_i = self.hash_to_band(&key[i], &self.r2);
         });
-
-        println!("Band: {:?}", &band[..5]);
-        println!("Start: {:?}", &start[..5]);
 
         let mut res = vec![0; n];
 
@@ -65,7 +62,7 @@ impl RbOkvsF2k {
         res
     }
 
-    fn create_sorted_matrix(&self, input: &Vec<Pair<u128, u128>>) -> Result<(Vec<U256>, Vec<usize>, Vec<u128>)> {
+    fn create_sorted_matrix(&self, input: &Vec<Pair<[u128; KEY_DIM], u128>>) -> Result<(Vec<U256>, Vec<usize>, Vec<u128>)> {
         let n = input.len();
         let mut start_pos: Vec<(usize, usize)> = vec![(0, 0); n];
         let mut matrix: Vec<U256> = vec![U256::default(); n];
@@ -73,7 +70,7 @@ impl RbOkvsF2k {
         let mut y: Vec<u128> = vec![0; n];
 
         start_pos.iter_mut().enumerate().for_each(|(i, start_pos_i)| {
-            *start_pos_i = (i, hash_to_index(input[i].0, &self.r1, self.columns - self.band_width));
+            *start_pos_i = (i, self.hash_to_index(&input[i].0, &self.r1, self.columns - self.band_width));
         });
 
         println!("Start pos: {:?}", &start_pos[..5]);
@@ -84,7 +81,7 @@ impl RbOkvsF2k {
 
 
         matrix.iter_mut().enumerate().for_each(|(i, matrix_i)| {
-            *matrix_i = hash_to_band(input[start_pos[i].0].0, &self.r2);
+            *matrix_i = self.hash_to_band(&input[start_pos[i].0].0, &self.r2);
         });
 
 
@@ -185,21 +182,25 @@ impl RbOkvsF2k {
 
         Ok(x)
     }
-}
 
-fn hash_to_index(x: u128, r1: &[u8; 16], columns: usize) -> usize {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(&x.to_le_bytes());
-    hasher.update(r1);
-    let hash = hasher.finalize();
-    let index = u128::from_le_bytes(hash.as_bytes()[0..16].try_into().unwrap()) % (columns as u128);
-    index as usize
-}
+    fn hash_to_index(&self, x: &[u128; KEY_DIM], r1: &[u8; 16], columns: usize) -> usize {
+        let mut hasher = blake3::Hasher::new();
+        x.iter().for_each(|&xi| {
+            hasher.update(&xi.to_le_bytes());
+        });
+        hasher.update(r1);
+        let hash = hasher.finalize();
+        let index = u128::from_le_bytes(hash.as_bytes()[0..16].try_into().unwrap()) % (columns as u128);
+        index as usize
+    }
 
-fn hash_to_band(x: u128, r2: &[u8; 16]) -> U256 {
-    let mut hasher = blake3::Hasher::new();
-    hasher.update(&x.to_le_bytes());
-    hasher.update(r2);
-    let hash = hasher.finalize();
-    U256::from_little_endian(hash.as_bytes())
+    fn hash_to_band(&self, x: &[u128; KEY_DIM], r2: &[u8; 16]) -> U256 {
+        let mut hasher = blake3::Hasher::new();
+        x.iter().for_each(|&xi| {
+            hasher.update(&xi.to_le_bytes());
+        });
+        hasher.update(r2);
+        let hash = hasher.finalize();
+        U256::from_little_endian(hash.as_bytes())
+    }
 }

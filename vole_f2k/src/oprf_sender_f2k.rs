@@ -4,19 +4,20 @@ use psi_okvs::okvs_f2k::RbOkvsF2k;
 use psi_aes::prg::PRG;
 use psi_utils::gf128::gf128mul;
 use blake3;
+use std::collections::HashMap;
 
-pub struct OprfSenderF2k {
+pub struct OprfSenderF2k<const KEY_DIM: usize> {
     n: usize,
     vole_sender: VoleTripleF2k,
     b: Vec<u128>,
     K: Vec<u128>,
     delta: u128,
-    okvs: RbOkvsF2k,
+    okvs: RbOkvsF2k<KEY_DIM>,
     w: u128, 
-    outputs_byte: Vec<[u8; 32]>,
+    outputs: HashMap<[u128; KEY_DIM], [u8; 32]>,
 }
 
-impl OprfSenderF2k {
+impl<const KEY_DIM: usize> OprfSenderF2k<KEY_DIM> {
     pub fn new<IO: CommunicationChannel>(io: &mut IO, n: usize, param: PrimalLPNParameterF2k, comm: &mut u64) -> Self {
         // Setup delta
         let mut prg = PRG::new(None, 0);
@@ -28,7 +29,7 @@ impl OprfSenderF2k {
         let r = io.receive_block::<16>().expect("Failed to receive okvs seed");
         let r1 = r[0];
         let r2 = r[1];
-        let okvs = RbOkvsF2k::new(n, &r1, &r2);
+        let okvs = RbOkvsF2k::<KEY_DIM>::new(n, &r1, &r2);
 
         let mut vole_triple = VoleTripleF2k::new(0, true, io, param, comm);
         vole_triple.setup_sender(io, delta, comm);
@@ -37,16 +38,16 @@ impl OprfSenderF2k {
         OprfSenderF2k {
             n,
             vole_sender: vole_triple,
-            b: vec![0; n],
-            K: vec![0; 2*n],
+            b: vec![0; okvs.columns],
+            K: vec![0; okvs.columns],
             delta,
             okvs,
             w: 0,
-            outputs_byte: vec![[0u8; 32]; n],
+            outputs: HashMap::new(),
         }
     }
 
-    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[u128], comm: &mut u64) {
+    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[[u128; KEY_DIM]], comm: &mut u64) {
         // Creating ws and send H(ws) to the receiver
         let mut prg = PRG::new(None, 0);
         let mut ws_bytes= [[0u8; 16]; 1];
@@ -61,8 +62,11 @@ impl OprfSenderF2k {
 
         // Running Vole
         // c = b + a * delta
+        println!("Number of vole: {}", self.okvs.columns);
         let mut z = vec![0u128; self.okvs.columns];
         self.vole_sender.extend(io, &mut self.b, &mut z, self.okvs.columns, comm); 
+
+        println!("Done vole");
 
         // Get w = ws + wr;
         let wr_bytes = io.receive_block::<16>().expect("Failed to receive wr");
@@ -83,17 +87,22 @@ impl OprfSenderF2k {
         let mut o = self.okvs.decode(&self.K, values);
 
         o.iter_mut().enumerate().for_each(|(i, oi)| {
-            let hash = blake3::hash(&values[i].to_le_bytes());
+            let mut hash = blake3::Hasher::new();
+            values[i].iter().for_each(|&x| {
+                hash.update(&x.to_le_bytes());
+            });
             let mut val_hash_bytes = [0u8; 16];
-            val_hash_bytes.copy_from_slice(&hash.as_bytes()[0..16]);
+            val_hash_bytes.copy_from_slice(&hash.finalize().as_bytes()[0..16]);
             let val_hash = u128::from_le_bytes(val_hash_bytes);
             *oi = *oi ^ gf128mul(self.delta, val_hash) ^ self.w;
         });
 
-        self.outputs_byte = vec![[0u8; 32]; self.n];
-        self.outputs_byte.iter_mut().enumerate().for_each(|(i, outputs_i)| {
+        let mut outputs_byte = vec![[0u8; 32]; values.len()];
+        outputs_byte.iter_mut().enumerate().for_each(|(i, outputs_i)| {
             let mut to_be_hashed = Vec::<u8>::new();
-            to_be_hashed.extend_from_slice(&values[i].to_le_bytes());
+            values[i].iter().for_each(|&x| {
+                to_be_hashed.extend_from_slice(&x.to_le_bytes());
+            });
             to_be_hashed.extend_from_slice(&o[i].to_le_bytes());
             let hash = blake3::hash(&to_be_hashed);
             let mut hash_bytes = [0u8; 32];
@@ -101,6 +110,12 @@ impl OprfSenderF2k {
             *outputs_i = hash_bytes;
         });
 
-        *comm += io.send_block::<32>(&self.outputs_byte).expect("Failed to send output hashes");
+        values.iter().zip(outputs_byte.iter()).for_each(|(x, o)| {
+            self.outputs.insert(*x, *o);
+        });
+    }
+
+    pub fn get_output(&self, x: &[u128; KEY_DIM]) -> Option<[u8; 32]> {
+        self.outputs.get(x).copied()
     }
 }

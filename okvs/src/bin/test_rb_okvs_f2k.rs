@@ -4,6 +4,7 @@ extern crate rand;
 use psi_okvs::okvs_f2k::RbOkvsF2k;
 use psi_okvs::types::Pair;
 use std::time::Instant;
+use std::convert::TryInto;
 use rand::RngCore;
 
 pub fn rand_u128() -> u128 {
@@ -15,10 +16,13 @@ pub fn rand_u128() -> u128 {
 
 fn main() {
     let size = 1000; // 1 million elements
+    const KEY_DIM: usize = 2;
 
-    let mut inputs: Vec<Pair<u128, u128>> = Vec::with_capacity(size);
+    let mut inputs: Vec<Pair<[u128; KEY_DIM], u128>> = Vec::with_capacity(size);
     for i in 0..size {
-        inputs.push((rand_u128(), rand_u128()));
+        let key: [u128; KEY_DIM] = (0..KEY_DIM).map(|_| rand_u128()).collect::<Vec<u128>>().try_into().unwrap();
+        let value = rand_u128();
+        inputs.push((key, value));
     }
 
     println!("Inputs: {:?}", &inputs[..5]);
@@ -37,7 +41,7 @@ fn main() {
         println!("{:?}", x);
     }
 
-    let keys = inputs.iter().map(|x| x.0.clone()).collect::<Vec<u128>>();
+    let keys = inputs.iter().map(|x| x.0.clone()).collect::<Vec<[u128; KEY_DIM]>>();
     let decoded = okvs.decode(&u, &keys);
 
 
