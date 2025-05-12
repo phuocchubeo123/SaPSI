@@ -51,7 +51,10 @@ impl<const KEY_DIM: usize> OprfReceiverF2k<KEY_DIM> {
         }).collect::<Vec<u128>>();
 
         let input_kv = values.iter().zip(hashes.iter()).map(|(x, h)| (*x, *h)).collect::<Vec<Pair<[u128; KEY_DIM], u128>>>();
+
+        let start = Instant::now();
         self.P = self.okvs.encode(&input_kv).expect("Failed to encode using OKVS");
+        println!("Encoding took {:?}", start.elapsed());
 
         let hws= io.receive_block::<32>().expect("Failed to receive H(ws) from the sender")[0];
 
@@ -90,6 +93,7 @@ impl<const KEY_DIM: usize> OprfReceiverF2k<KEY_DIM> {
         let A_bytes = A.iter().map(|x| x.to_le_bytes()).collect::<Vec<[u8; 16]>>();
         *comm += io.send_block::<16>(&A_bytes).expect("Failed to send A to the sender");
         println!("Sending A took {:?}", start.elapsed());
+        println!("Size of A: {}", A.len());
 
         let mut o = self.okvs.decode(&c, &values);
         o.iter_mut().enumerate().for_each(|(i, oi)| {

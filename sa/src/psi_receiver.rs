@@ -4,9 +4,9 @@ use crate::idcf_sender::IDCFSender;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
+use psi_volef2k::oprf_receiver_f2k::OprfReceiverF2k;
+use psi_volef2k::vole_triple_f2k::PrimalLPNParameterF2k;
 use rand::prelude::*;
-// use sha3::{Digest, Sha3_256};
-// use blake2::{Blake2s, Blake2s256, Digest};
 use blake3;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -26,7 +26,7 @@ impl SAPSIReceiver {
         }
     }
 
-    pub fn receive<IO: CommunicationChannel>(&self, io: &mut IO, values: &[[u128; DIMENSION]], comm: &mut u64) {
+    pub fn receive<IO: CommunicationChannel>(&self, io: &mut IO, values: &[[u128; DIMENSION]], param: PrimalLPNParameterF2k, comm: &mut u64) {
         let mut processed_points: Vec<([u128; DIMENSION], [u128; DIMENSION])> = Vec::new();
         values.iter().for_each(|point| {
             let processed_point= preprocess_point(point);
@@ -36,6 +36,16 @@ impl SAPSIReceiver {
             processed_points.extend_from_slice(processed_point.as_slice());
         });
 
+        println!("Origin length: {}", processed_points.len());
+
+        // Run OPRF for the origins
+        let origins = processed_points.iter().map(|(origin, _)| *origin).collect::<Vec<[u128; DIMENSION]>>();
+        
+        let start = Instant::now();
+        let mut oprf_receiver = OprfReceiverF2k::<DIMENSION>::new(io, N << DIMENSION, param, comm);
+        println!("Receiver setup OPRF in {:?}", start.elapsed());
+        oprf_receiver.receive(io, &origins, comm);
+        println!("Receiver computed OPRF in {:?}", start.elapsed());
 
         let mut simple_table = SimpleHash::<DIMENSION>::new(self.table_size, 100000, LOC_FUNC_COUNT);
         simple_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
@@ -130,8 +140,9 @@ impl SAPSIReceiver {
                     // Get the corresponding hash
                     let mut to_be_hashed = Vec::<u8>::new();
                     to_be_hashed.extend_from_slice(&index.to_le_bytes());
+                    let origin_oprf = oprf_receiver.get_output(origin).expect("Failed to get oprf output for receiver");
                     for i in 0..DIMENSION {
-                        to_be_hashed.extend_from_slice(&origin[i].to_le_bytes()); // Change to OPRF later
+                        to_be_hashed.extend_from_slice(&origin_oprf); // Change to OPRF later
                     }
                     for i in 0..DIMENSION {
                         to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());

@@ -1,5 +1,6 @@
 extern crate psi_sa;
 extern crate psi_network;
+extern crate psi_volef2k;
 extern crate rand;
 extern crate rand_chacha;
 
@@ -8,6 +9,7 @@ use psi_sa::psi_sender::SAPSISender;
 use psi_sa::psi_receiver::SAPSIReceiver;
 use psi_network::socket_channel::TcpChannel;
 use psi_network::comm_channel::CommunicationChannel;
+use psi_volef2k::vole_triple_f2k::{LPN5, LPN13, LPN17};
 use std::env;
 use std::net::{TcpListener, TcpStream};
 use std::collections::HashSet;
@@ -55,6 +57,7 @@ fn main() {
 
     const size: usize = N;
     const table_size: usize = ((size as f32) * 1.8) as usize;
+    let param = LPN13;
 
     if role == "receiver" {
         println!("Starting as Receiver...");
@@ -95,7 +98,7 @@ fn main() {
         let start = Instant::now();
 
         let mut receiver_psi = SAPSIReceiver::new(size, table_size);
-        receiver_psi.receive(&mut channel, &data, &mut comm);
+        receiver_psi.receive(&mut channel, &data, param, &mut comm);
 
         println!("Receiver finished in {:?}", start.elapsed());
         println!("Total communication: {} bytes", comm);
@@ -163,7 +166,7 @@ fn main() {
         let start = Instant::now();
 
         let mut sender_psi = SAPSISender::new(size, table_size);
-        sender_psi.send(&mut channel, &data, &mut comm);
+        sender_psi.send(&mut channel, &data, param, &mut comm);
 
         println!("Sender finished in {:?}", start.elapsed());
         println!("Total communication: {} bytes", comm);

@@ -10,6 +10,7 @@ path = "src/lib.rs"
 psi-network = { workspace = true }
 psi-ot = { workspace = true }
 psi-aes = { workspace = true }
+psi-volef2k = { workspace = true }
 sha3 = "0.10.8"
 aes = "0.8.4"
 rand = "0.8"

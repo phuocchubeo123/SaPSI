@@ -5,6 +5,7 @@ use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
 use psi_utils::gf128::gf128mul;
+use std::time::Instant;
 
 pub struct PrimalLPNParameterF2k {
     n: usize,
@@ -84,6 +85,18 @@ impl PrimalLPNParameterF2k {
         self.n - self.t - self.k - 1
     }
 }
+
+pub const LPN5: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
+    n: 800, t: 100, k: 410, log_bin_sz: 3,
+    n_pre: 640, t_pre: 160, k_pre: 250, log_bin_sz_pre: 2,
+    n_pre0: 560, t_pre0: 140, k_pre0: 250, log_bin_sz_pre0: 2,
+};
+
+pub const LPN13: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
+    n: 4000, t: 500, k: 800, log_bin_sz: 3,
+    n_pre: 1800, t_pre: 225, k_pre: 500, log_bin_sz_pre: 3,
+    n_pre0: 800, t_pre0: 100, k_pre0: 410, log_bin_sz_pre0: 3,
+};
 
 pub const LPN17: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
     n: 150016, t: 1172, k: 9000, log_bin_sz: 7,
@@ -229,6 +242,7 @@ impl VoleTripleF2k {
     }
 
     pub fn setup_receiver<IO: CommunicationChannel>(&mut self, io: &mut IO, comm: &mut u64) {
+        let start = Instant::now();
         let delta_bytes = io.receive_block::<16>().expect("Failed to receive test delta");
         self.delta = u128::from_le_bytes(delta_bytes[0]);
 
@@ -247,8 +261,13 @@ impl VoleTripleF2k {
         let triple_n0 = 1 + self.param.t_pre0 + self.param.k_pre0;
         let mut mac = vec![0u128; triple_n0];
         let mut u = vec![0u128; triple_n0];
+
+        println!("Time for cot gen preot: {:?}", start.elapsed());
+
         let mut svole0 = BaseSvoleF2k::new_receiver(io, comm);
         svole0.triple_gen_recv(io, &mut mac, &mut u, triple_n0, comm);
+
+        println!("Time for svole0: {:?}", start.elapsed()); 
 
         // println!("Test base svole: {:?}", mac[0] - u[0] * self.delta);
 
@@ -268,6 +287,8 @@ impl VoleTripleF2k {
 
         let m_pre = self.param.log_bin_sz_pre * self.param.t_pre;
         self.cot.cot_gen_preot(io, &mut pre_ot_ini, m_pre, None, comm);
+
+        println!("Time for cot gen preot: {:?}", start.elapsed());
 
         // 
         let triple_n = 1 + self.param.t_pre + self.param.k_pre;        

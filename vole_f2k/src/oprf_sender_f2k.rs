@@ -78,7 +78,7 @@ impl<const KEY_DIM: usize> OprfSenderF2k<KEY_DIM> {
         // Receive A = P + a from the receiver and get K = b + A * delta
         let A_bytes = io.receive_block::<16>().expect("Failed to receive A");
         let A = A_bytes.iter().map(|&x| u128::from_le_bytes(x)).collect::<Vec<u128>>();
-        let mut K = vec![0u128; 2*self.n];
+        let mut K = vec![0u128; self.okvs.columns];
         K.iter_mut().enumerate().for_each(|(i, Ki)| {
             *Ki = self.b[i] ^ gf128mul(A[i], self.delta);
         });

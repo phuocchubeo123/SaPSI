@@ -7,8 +7,9 @@ use std::collections::HashSet;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_network::comm_channel::CommunicationChannel;
+use psi_volef2k::oprf_sender_f2k::OprfSenderF2k;
+use psi_volef2k::vole_triple_f2k::PrimalLPNParameterF2k;
 use rand::prelude::*;
-// use blake2::{Blake2s256, Digest};
 use blake3;
 
 // URGENT: Need to implement OPRF
@@ -28,11 +29,19 @@ impl SAPSISender {
         }
     }
 
-    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[[u128; DIMENSION]], comm: &mut u64) {
+    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[[u128; DIMENSION]], param: PrimalLPNParameterF2k, comm: &mut u64) {
         // All (origin, recentered_point) pairs
         let processed_points: Vec<([u128; DIMENSION], [u128; DIMENSION])> = values.iter()
             .map(|point| preprocess_point(point))
             .collect();
+
+        // Run OPRF for the origins
+        // Note that 
+        let origins = processed_points.iter()
+            .map(|(origin, _)| *origin)
+            .collect::<Vec<[u128; DIMENSION]>>();
+        let mut oprf_sender= OprfSenderF2k::<DIMENSION>::new(io, N << DIMENSION, param, comm);
+        oprf_sender.send(io, &origins, comm);
 
         // Prepare cuckoo hash table
         let mut cuckoo_table = CuckooHash::<DIMENSION>::new(self.table_size, 100);
@@ -187,7 +196,7 @@ impl SAPSISender {
             // Now start DFS
             good_prefix.iter().for_each(|(pref, length)| {
                 // println!("Initial Search Prefix: {:?}, Length: {:?}", pref, length);
-                self.int_search(&idcf_table[index], index, &origin, &pref, &length, &hashes_set[index]);
+                self.int_search(&idcf_table[index], index, &origin, &oprf_sender, &pref, &length, &hashes_set[index]);
             });
 
             // println!();
@@ -207,7 +216,7 @@ impl SAPSISender {
         println!("Intersection size: {}", self.intersection.len());
     }
 
-    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, origin: &[u128; DIMENSION], prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 32]>) {
+    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, origin: &[u128; DIMENSION], oprf: &OprfSenderF2k<DIMENSION>, prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 32]>) {
         // println!("Current prefix: {:?}, Length: {:?}", prefix, length);
         // I'm sure that each pair of 2i, 2i+1 prefix has the same length
         for i in 0..DIMENSION {
@@ -221,7 +230,7 @@ impl SAPSISender {
                     new_length[2*i] += 1;
                     new_length[2*i+1] += 1;
                     // println!("Brute Old prefix: {:?}, New prefix: {:?}", prefix, new_prefix);
-                    self.int_search(idcf_table, index, origin, &new_prefix, &new_length, hashes);
+                    self.int_search(idcf_table, index, origin, oprf, &new_prefix, &new_length, hashes);
                 }
                 return;
             }
@@ -229,8 +238,9 @@ impl SAPSISender {
         // Get the corresponding hash
         let mut to_be_hashed = Vec::<u8>::new();
         to_be_hashed.extend_from_slice(&index.to_le_bytes());
+        let origin_oprf = oprf.get_output(origin).expect("Failed to get oprf output sender");  
         for i in 0..DIMENSION {
-            to_be_hashed.extend_from_slice(&origin[i].to_le_bytes()); // Change to OPRF later
+            to_be_hashed.extend_from_slice(&origin_oprf); // Change to OPRF later
         }
         for i in 0..DIMENSION2 {
             to_be_hashed.extend_from_slice(&prefix[i].to_le_bytes());
@@ -270,7 +280,7 @@ impl SAPSISender {
                     new_length[2*i] += 1;
                     new_length[2*i+1] += 1;
                     // println!("Search Old prefix: {:?}, New prefix: {:?}", prefix, new_prefix);
-                    self.int_search(idcf_table, index, origin, &new_prefix, &new_length, hashes);
+                    self.int_search(idcf_table, index, origin, oprf, &new_prefix, &new_length, hashes);
                 }
                 return;
             }

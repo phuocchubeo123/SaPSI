@@ -40,7 +40,6 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
         let n = key.len();
         let mut start = vec![0usize; n];
         let mut band = vec![U256::default(); n];
-
         start.iter_mut().enumerate().for_each(|(i, start_i)| {
             *start_i = self.hash_to_index(&key[i], &self.r1, self.columns - self.band_width);
         });
