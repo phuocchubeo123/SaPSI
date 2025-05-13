@@ -125,16 +125,12 @@ impl SAPSISender {
         println!("Sender computed IDCF in {:?}", start.elapsed());
 
         // Receive hashes from the receiver
-        let mut hashes: Vec<Vec<[u8; 32]>> = Vec::new();
-        for _index in 0..self.table_size {
-            let hash = io.receive_block::<32>().expect("Failed to receive intersection hash from receiver");
-            hashes.push(hash);
-        }
+        let mut hashes_set: Vec<HashSet<[u8; 16]>> = Vec::new();
 
-        let mut hashes_set: Vec<HashSet<[u8; 32]>> = Vec::new();
-        for index in 0..self.table_size {
+        for _index in 0..self.table_size {
+            let hash = io.receive_block::<16>().expect("Failed to receive intersection hash from receiver");
             let mut hash_set = HashSet::new();
-            hashes[index].iter().for_each(|h| {
+            hash.iter().for_each(|h| {
                 hash_set.insert(*h);
             });
             hashes_set.push(hash_set);
@@ -216,7 +212,7 @@ impl SAPSISender {
         println!("Intersection size: {}", self.intersection.len());
     }
 
-    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, origin: &[u128; DIMENSION], oprf: &OprfSenderF2k<DIMENSION>, prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 32]>) {
+    pub fn int_search(&mut self, idcf_table: &Vec<Vec<[u8; 16]>>, index: usize, origin: &[u128; DIMENSION], oprf: &OprfSenderF2k<DIMENSION>, prefix: &[u128; DIMENSION2], length: &[usize; DIMENSION2], hashes: &HashSet<[u8; 16]>) {
         // println!("Current prefix: {:?}, Length: {:?}", prefix, length);
         // I'm sure that each pair of 2i, 2i+1 prefix has the same length
         for i in 0..DIMENSION {
@@ -249,8 +245,8 @@ impl SAPSISender {
             to_be_hashed.extend_from_slice(idcf_table[i][(1 << length[i]) - 1 + prefix[i] as usize].as_slice());
         }
         let hash1 = blake3::hash(&to_be_hashed);
-        let mut hsh = [0u8; 32];
-        hsh.copy_from_slice(hash1.as_bytes());
+        let mut hsh = [0u8; 16];
+        hsh.copy_from_slice(&hash1.as_bytes()[0..16]);
 
         // If the critical prefix hash is not in the hash set, prune
         if !hashes.contains(&hsh) {

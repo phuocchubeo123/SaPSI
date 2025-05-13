@@ -9,7 +9,7 @@ use psi_sa::psi_sender::SAPSISender;
 use psi_sa::psi_receiver::SAPSIReceiver;
 use psi_network::socket_channel::TcpChannel;
 use psi_network::comm_channel::CommunicationChannel;
-use psi_volef2k::vole_triple_f2k::{LPN5, LPN13, LPN17};
+use psi_volef2k::vole_triple_f2k::{LPN12, LPN16, LPN20};
 use std::env;
 use std::net::{TcpListener, TcpStream};
 use std::collections::HashSet;
@@ -56,8 +56,58 @@ fn main() {
     let mut comm: u64 = 0;
 
     const size: usize = N;
-    const table_size: usize = ((size as f32) * 1.8) as usize;
-    let param = LPN13;
+    const table_size: usize = ((size as f32) * 1.5) as usize;
+    let mut param = LPN12;
+    if size == 1 << 8 {
+        param = LPN12;
+    } else if size == 1 << 12 {
+        param = LPN16;
+    } else if size == 1 << 16 {
+        param = LPN20;
+    } else {
+        panic!("Invalid size, only accept 2^8, 2^12, or 2^16");
+    }
+
+    if RADIUS == 10 {
+        if RANGE_BITS != 6 {
+            panic!("RADIUS = 10, but RANGE_BITS != 6");
+        } 
+        if PREF_LENGTH != [2, 4, 6] {
+            panic!("RADIUS = 10, but PREF_LENGTH != [2, 4, 6]");
+        }
+    } else if RADIUS == 30 {
+        if RANGE_BITS != 7 {
+            panic!("RADIUS = 30, but RANGE_BITS != 7");
+        }
+        if PREF_LENGTH != [1, 3, 5, 7] {
+            panic!("RADIUS = 30, but PREF_LENGTH != [1, 3, 5, 7]");
+        }
+    } else if RADIUS == 60 {
+        if RANGE_BITS != 8 {
+            panic!("RADIUS = 60, but RANGE_BITS != 8");
+        }
+        if PREF_LENGTH != [2, 4, 6, 8] {
+            panic!("RADIUS = 60, but PREF_LENGTH != [2, 4, 6, 8]");
+        }
+    } else if RADIUS == 120 {
+        if RANGE_BITS != 9 {
+            panic!("RADIUS = 120, but RANGE_BITS != 9");
+        }
+        if PREF_LENGTH != [1, 3, 5, 7, 9] {
+            panic!("RADIUS = 120, but PREF_LENGTH != [1, 3, 5, 7, 9]");
+        }
+    } else if RADIUS == 250 {
+        if RANGE_BITS != 10 {
+            panic!("RADIUS = 250, but RANGE_BITS != 10");
+        }
+        if PREF_LENGTH != [2, 4, 6, 8, 10] {
+            panic!("RADIUS = 250, but PREF_LENGTH != [2, 4, 6, 8, 10]");
+        }
+    } else {
+        panic!("Invalid RADIUS");
+    }
+
+    println!("Running PSI with size: {}, table_size: {}, radius: {}, dimension: {}", size, table_size, RADIUS, DIMENSION);
 
     if role == "receiver" {
         println!("Starting as Receiver...");

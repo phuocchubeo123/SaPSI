@@ -114,7 +114,6 @@ impl SAPSIReceiver {
         //     }
         // }
 
-        let mut hashes_set: Vec<HashSet<[u8; 32]>> = Vec::new();
 
         // Send the hash values
         let start = Instant::now();
@@ -125,20 +124,25 @@ impl SAPSIReceiver {
         let mut max_bin_size = 0;
         let mut total_size = 0;
         let mut num_hashes = 0;
+        let mut to_be_hashed = Vec::<u8>::new();
+        let mut prefixes_and_lengths = Vec::<([u128; DIMENSION], [usize; DIMENSION])>::new();
+
+        let mut hash_vecs: Vec<Vec<[u8; 16]>> = Vec::new();
 
         for index in 0..self.table_size {
             // println!("Index: {}", index);
             let points_set = simple_table.query_table(index);
-            let mut hashes = HashSet::<[u8; 32]>::new();
+            let mut hashes = HashSet::<[u8; 16]>::new();
             points_set.iter().for_each(|(origin, transformed_point)| {
-                let prefixes_and_lengths = get_prefixes(transformed_point);
+                prefixes_and_lengths.clear();
+                prefixes_and_lengths = get_prefixes(transformed_point);
 
                 // println!("Transformed Point: {:?}", transformed_point);
                 // println!("Prefixes: {:?}", prefixes);
 
                 prefixes_and_lengths.iter().for_each(|(prefix, length)| {
                     // Get the corresponding hash
-                    let mut to_be_hashed = Vec::<u8>::new();
+                    to_be_hashed.clear();
                     to_be_hashed.extend_from_slice(&index.to_le_bytes());
                     let origin_oprf = oprf_receiver.get_output(origin).expect("Failed to get oprf output for receiver");
                     for i in 0..DIMENSION {
@@ -153,8 +157,8 @@ impl SAPSIReceiver {
                         to_be_hashed.extend_from_slice(idcf_table[index][2*i+1][(1 << length[i]) - 1 + (1 << length[i]) - 1 - prefix[i] as usize].as_slice()); // check prefix length
                     }
                     let hash1 = blake3::hash(&to_be_hashed);
-                    let mut hsh = [0u8; 32];
-                    hsh.copy_from_slice(hash1.as_bytes());
+                    let mut hsh = [0u8; 16];
+                    hsh.copy_from_slice(&hash1.as_bytes()[0..16]);
 
                     if *length == [RANGE_BITS; DIMENSION] {
                         // println!("Origin: {:?}, Point: {:?}", origin, prefix);
@@ -164,8 +168,13 @@ impl SAPSIReceiver {
                     hashes.insert(hsh);
                 });
             });
-            hashes_set.push(hashes.clone());
             num_hashes += hashes.len();
+            let mut hash_vec = Vec::<[u8; 16]>::new();
+            hashes.iter().for_each(|h| {
+                hash_vec.push(*h);
+            });
+            hash_vecs.push(hash_vec);
+            hashes.clear();
             max_bin_size = max(max_bin_size, points_set.len());
         }
 
@@ -185,22 +194,9 @@ impl SAPSIReceiver {
         // }
 
 
-        let mut hashes: Vec<Vec<[u8; 32]>> = Vec::new();
         for index in 0..self.table_size {
-            let mut hash = Vec::<[u8; 32]>::new();
-            hashes_set[index].iter().for_each(|h| {
-                // println!("Hash: {:?}", h);
-                hash.push(*h);
-            });
-            hashes.push(hash);
-        }
-
-        // hashes[27].iter().for_each(|h| {
-        //     println!("Hash: {:?}", h);
-        // });
-
-        for index in 0..self.table_size {
-            *comm += io.send_block::<32>(&hashes[index]).expect("Failed to send intersection hash");
+            *comm += io.send_block::<16>(&hash_vecs[index]).expect("Failed to send intersection hash");
+            hash_vecs[index].clear();
         }
     }
 }

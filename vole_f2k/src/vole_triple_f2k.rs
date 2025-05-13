@@ -86,34 +86,22 @@ impl PrimalLPNParameterF2k {
     }
 }
 
-pub const LPN5: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
-    n: 800, t: 100, k: 410, log_bin_sz: 3,
-    n_pre: 640, t_pre: 160, k_pre: 250, log_bin_sz_pre: 2,
-    n_pre0: 560, t_pre0: 140, k_pre0: 250, log_bin_sz_pre0: 2,
+pub const LPN12: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
+    n: 5600, t: 700, k: 600, log_bin_sz: 3,
+    n_pre: 1400, t_pre: 350, k_pre: 300, log_bin_sz_pre: 2,
+    n_pre0: 800, t_pre0: 200, k_pre0: 250, log_bin_sz_pre0: 2,
 };
 
-pub const LPN13: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
-    n: 4000, t: 500, k: 800, log_bin_sz: 3,
-    n_pre: 1800, t_pre: 225, k_pre: 500, log_bin_sz_pre: 3,
-    n_pre0: 800, t_pre0: 100, k_pre0: 410, log_bin_sz_pre0: 3,
+pub const LPN16: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
+    n: 76800, t: 1200, k: 5000, log_bin_sz: 6,
+    n_pre: 6400, t_pre: 800, k_pre: 650, log_bin_sz_pre: 3,
+    n_pre0: 1500, t_pre0: 375, k_pre0: 300, log_bin_sz_pre0: 2,
 };
 
-pub const LPN17: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
-    n: 150016, t: 1172, k: 9000, log_bin_sz: 7,
-    n_pre: 10304, t_pre: 644, k_pre: 1120, log_bin_sz_pre: 4,
-    n_pre0: 1800, t_pre0: 225, k_pre0: 600, log_bin_sz_pre0: 3,
-};
-
-pub const LPN21: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
-    n: 2201600, t: 1075, k: 120000, log_bin_sz: 11,
-    n_pre: 122112, t_pre: 954, k_pre: 8000, log_bin_sz_pre: 7,
-    n_pre0: 10304, t_pre0: 644, k_pre0: 1120, log_bin_sz_pre0: 4,
-};
-
-pub const LPN25: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
-    n: 33751040, t: 1030, k: 1700000, log_bin_sz: 15,
-    n_pre: 1710080, t_pre: 1670, k_pre: 70000, log_bin_sz_pre: 10,
-    n_pre0: 73088, t_pre0: 1142, k_pre0: 4200, log_bin_sz_pre0: 6,
+pub const LPN20: PrimalLPNParameterF2k = PrimalLPNParameterF2k {
+    n: 1088000, t: 8500, k: 30500, log_bin_sz: 7,
+    n_pre: 40000, t_pre: 1250, k_pre: 3000, log_bin_sz_pre: 5,
+    n_pre0: 4400, t_pre0: 550, k_pre0: 600, log_bin_sz_pre0: 3,
 };
 
 pub struct VoleTripleF2k {
