@@ -53,6 +53,7 @@ fn get_origin(point: &[u128; DIMENSION]) -> [u128; DIMENSION] {
 
 fn main() {
     let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
+    let port = env::args().nth(2).expect("Please specify the port as an argument");
     let mut comm: u64 = 0;
 
     const size: usize = N;
@@ -111,7 +112,7 @@ fn main() {
 
     if role == "receiver" {
         println!("Starting as Receiver...");
-        let listener = TcpListener::bind("127.0.0.1:8080")
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", port))
             .expect("Failed to bind to port");
         let (stream, _) = listener.accept().expect("Failed to accept connection");
         let mut channel = TcpChannel::new(stream);
@@ -153,7 +154,7 @@ fn main() {
         println!("Receiver finished in {:?}", start.elapsed());
         println!("Total communication: {} bytes", comm);
     } else if role == "sender" {
-        let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
+        let stream = TcpStream::connect(format!("127.0.0.1:{}", port)).expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
 
         let mut seed = [2u8; 32]; // debugging with seed 0 first
