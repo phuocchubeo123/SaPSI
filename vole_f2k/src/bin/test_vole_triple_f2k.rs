@@ -3,7 +3,7 @@ extern crate psi_network;
 
 use psi_network::socket_channel::TcpChannel;
 use psi_volef2k::vole_triple_f2k::VoleTripleF2k;
-use psi_volef2k::vole_triple_f2k::LPN17;
+use psi_volef2k::vole_triple_f2k::LPN16;
 use psi_volef2k::utils_f2k::rand_u128;
 use std::net::{TcpListener, TcpStream};
 use std::time::Instant;
@@ -18,7 +18,7 @@ fn main() {
         let (stream, _) = listener.accept().expect("Failed to accept connection");
         let mut channel = TcpChannel::new(stream);
 
-        let mut vole = VoleTripleF2k::new(1, true, &mut channel, LPN17, &mut comm);
+        let mut vole = VoleTripleF2k::new(1, true, &mut channel, LPN16, &mut comm);
 
         let start = std::time::Instant::now();
         vole.setup_receiver(&mut channel, &mut comm);
@@ -39,7 +39,7 @@ fn main() {
         let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
 
-        let mut vole = VoleTripleF2k::new(0, true, &mut channel, LPN17, &mut comm);
+        let mut vole = VoleTripleF2k::new(0, true, &mut channel, LPN16, &mut comm);
 
         let delta = rand_u128();
         vole.setup_sender(&mut channel, delta, &mut comm);

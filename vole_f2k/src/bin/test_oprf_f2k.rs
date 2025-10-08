@@ -7,8 +7,7 @@ use psi_network::socket_channel::TcpChannel;
 use psi_network::comm_channel::CommunicationChannel;
 use psi_volef2k::oprf_sender_f2k::OprfSenderF2k;
 use psi_volef2k::oprf_receiver_f2k::OprfReceiverF2k;
-use psi_volef2k::vole_triple_f2k::{LPN17};
-use psi_volef2k::utils_f2k::rand_u128;
+use psi_volef2k::vole_triple_f2k::LPN16;
 use std::net::{TcpListener, TcpStream};
 use std::convert::TryInto;
 use rand::prelude::*;
@@ -43,7 +42,7 @@ fn main() {
             x
         }).collect::<Vec<[u128; KEY_DIM]>>();
 
-        let mut oprf = OprfReceiverF2k::<KEY_DIM>::new(&mut channel, size, LPN17, &mut comm);
+        let mut oprf = OprfReceiverF2k::<KEY_DIM>::new(&mut channel, size, LPN16, &mut comm);
         oprf.receive(&mut channel, &data, &mut comm);
 
         data.iter().for_each(|x| {
@@ -66,7 +65,7 @@ fn main() {
             x
         }).collect::<Vec<[u128; KEY_DIM]>>();
 
-        let mut oprf = OprfSenderF2k::<KEY_DIM>::new(&mut channel, size, LPN17, &mut comm);
+        let mut oprf = OprfSenderF2k::<KEY_DIM>::new(&mut channel, size, LPN16, &mut comm);
         oprf.send(&mut channel, &data, &mut comm);
 
         data.iter().for_each(|x| {

@@ -4,7 +4,6 @@ use lambdaworks_math::field::fields::fft_friendly::stark_252_prime_field::Stark2
 use lambdaworks_math::field::element::FieldElement;
 use lambdaworks_math::traits::ByteConversion;
 use rand::Rng;
-use std::time::Instant;
 
 /// Alias for the STARK-252 prime field and its field element.
 pub type F = Stark252PrimeField;

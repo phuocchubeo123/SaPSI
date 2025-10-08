@@ -1,4 +1,4 @@
-use psi_aes::ccrh::{self, CCRH};
+use psi_aes::ccrh::CCRH;
 use psi_network::comm_channel::CommunicationChannel;
 
 // Section 6.1 of https://eprint.iacr.org/2019/074.pdf
