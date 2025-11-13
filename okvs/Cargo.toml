@@ -22,7 +22,4 @@ default = ["parallel"]
 parallel = ["dep:rayon"]
 
 [[bin]]
-name = "test_rb_okvs"
-
-[[bin]]
 name = "test_rb_okvs_f2k"

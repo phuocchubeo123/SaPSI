@@ -106,7 +106,7 @@ impl CCRH {
 
     /// Permute blocks using AES encryption
     pub fn permute_block(&self, blocks: &mut [[u8; 32]]) {
-        for (i, block) in blocks.iter_mut().enumerate() {
+        for block in blocks.iter_mut() {
             let aes_key = Aes256::new(GenericArray::from_slice(block));
             let mut permuted_block: [_; 2] = core::array::from_fn(|i| GenericArray::clone_from_slice(&[i as u8; 16]));
             // Encrypt the 4 blocks using the AES key

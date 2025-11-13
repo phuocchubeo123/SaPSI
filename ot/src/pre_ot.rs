@@ -43,24 +43,17 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
         let mut hashed_data = vec![vec![[0u8; 16]; 2*self.n]; NUM_LIMBS];
         for i in 0..NUM_LIMBS {
             let kxori: Vec<[u8; 16]> = pre_hash_data.iter().map(|x| xor_block(x, &[i as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])).collect(); // Get k_i \xor i
-            ccrh.Hn(&mut hashed_data[i], &kxori, 2*self.n);
+            ccrh.hash_blocks(&mut hashed_data[i], &kxori, 2*self.n);
         }
         for i in 0..2*self.n {
             for j in 0..NUM_LIMBS {
                 self.pre_data[i][j] = u128::from_le_bytes(hashed_data[j][i]);
             }
         }
-
-        // for i in 0..10 {
-        //     println!("This OT:");
-        //     println!("{:?}", self.pre_data[i]);
-        //     println!("{:?}", self.pre_data[i + self.n]);
-        // }
     }
 
     // Take COT messages already prepared and turn them into random keys for lengthening OT later
     pub fn recv_pre(&mut self, data: &[[u8; 16]], bits: Option<&[bool]>) {
-        let ccrh = CCRH::new();
         if let Some(b) = bits {
             self.bits[..self.n].copy_from_slice(b);
         } else {
@@ -76,7 +69,7 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
         let mut hashed_data = vec![vec![[0u8; 16]; self.n]; NUM_LIMBS];
         for i in 0..NUM_LIMBS {
             let kxori: Vec<[u8; 16]> = pre_hash_data.iter().map(|x| xor_block(x, &[i as u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])).collect(); // Get k_i \xor i
-            ccrh.Hn(&mut hashed_data[i], &kxori, self.n);
+            ccrh.hash_blocks(&mut hashed_data[i], &kxori, self.n);
         }
         for i in 0..self.n {
             for j in 0..NUM_LIMBS {
@@ -91,7 +84,7 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
     }
 
     // Spend one more round to send the choice bits
-    pub fn choices_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, comm: &mut u64) {
+    pub fn choices_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, _comm: &mut u64) {
         let received_bits = io.receive_bits().expect("Failed to receive bits");
         for (i, &bit) in received_bits.iter().enumerate() {
             self.bits[self.count + i] = bit;

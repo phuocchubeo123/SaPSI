@@ -1,6 +1,5 @@
 use aes::Aes128;
 use aes::cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
-use std::convert::TryInto;
 
 // Here, we model fixed key AES as random permutation
 pub struct CCRH {
@@ -16,8 +15,8 @@ impl CCRH {
         }
     }
 
-    pub fn Hn(&self, output: &mut [[u8; 16]], input: &[[u8; 16]], length: usize) {
-        let mut scratch: Vec<[u8; 16]> = input.iter().map(|&x| sigma(x)).collect();
+    pub fn hash_blocks(&self, output: &mut [[u8; 16]], input: &[[u8; 16]], length: usize) {
+        let scratch: Vec<[u8; 16]> = input.iter().map(|&x| sigma(x)).collect();
         let mut generic_scratch: Vec<_> = scratch.iter().map(|x| GenericArray::clone_from_slice(x)).collect();
         self.aes.encrypt_blocks(&mut generic_scratch);
         for (i, enc) in generic_scratch.iter().enumerate() {

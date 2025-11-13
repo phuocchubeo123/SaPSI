@@ -151,14 +151,13 @@ impl BaseCot {
                 io.send_block::<16>(&[delta]).expect("Failed to send delta");
             }
             io.send_block::<16>(data).expect("Failed to send check data");
-            io.flush();
+            io.flush().expect("Failed to flush IO");
             true
         } else {
-            let mut tmp = vec![[0u8; 16]; len];
             let mut ch = [[0u8; 16]; 2];
             ch[1] = io.receive_block::<16>().expect("Failed to receiver delta")[0];
             ch[0] = [0u8; 16];
-            tmp = io.receive_block::<16>().expect("Failed to receive check data");
+            let mut tmp = io.receive_block::<16>().expect("Failed to receive check data");
             for i in 0..len {
                 tmp[i] = bitwise_xor(&tmp[i], &ch[get_lsb(&data[i]) as usize]);
             }

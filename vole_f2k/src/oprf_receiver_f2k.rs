@@ -1,7 +1,6 @@
 use crate::vole_triple_f2k::{PrimalLPNParameterF2k, VoleTripleF2k};
 use psi_network::comm_channel::CommunicationChannel;
-use psi_okvs::okvs_f2k::RbOkvsF2k;
-use psi_okvs::types::Pair;
+use psi_okvs::okvs_f2k::{RbOkvsF2k, Pair};
 use psi_aes::prg::PRG;
 use blake3;
 use std::time::Instant;

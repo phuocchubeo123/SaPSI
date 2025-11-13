@@ -1,8 +1,7 @@
 extern crate psi_okvs;
 extern crate rand;
 
-use psi_okvs::okvs_f2k::RbOkvsF2k;
-use psi_okvs::types::Pair;
+use psi_okvs::okvs_f2k::{RbOkvsF2k, Pair};
 use std::time::Instant;
 use std::convert::TryInto;
 use rand::RngCore;

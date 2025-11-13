@@ -12,9 +12,6 @@ rand = "0.8"
 name = "test_prg"
 
 [[bin]]
-name = "test_two_key_prp"
-
-[[bin]]
 name = "test_ccrh"
 
 [[bin]]

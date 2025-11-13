@@ -135,7 +135,7 @@ impl IKNP {
 
         let mut t = vec![[0u8; NUM_BYTES]; BLOCK_SIZE];
         let mut res = vec![[0u8; NUM_BYTES]; BLOCK_SIZE];
-        let mut tmp = io.receive_block::<NUM_BYTES>().expect("Failed to receive tmp to xor later");
+        let tmp = io.receive_block::<NUM_BYTES>().expect("Failed to receive tmp to xor later");
 
         if let Some(prgs) = &mut self.g0 {
             for (i, prg) in prgs.iter_mut().enumerate() {
@@ -239,18 +239,15 @@ impl IKNP {
         }
     }
 
-    pub fn send_check<IO: CommunicationChannel>(&mut self, io: &mut IO, out: &[[u8; NUM_BYTES]], length: usize, comm: &mut u64) -> bool {
-        let mut seed2 = [0u8; 16];
-        let mut x = [0u8; NUM_BYTES];
-        let mut t = [[0u8; NUM_BYTES]; 2];
+    pub fn send_check<IO: CommunicationChannel>(&mut self, io: &mut IO, out: &[[u8; NUM_BYTES]], length: usize, _comm: &mut u64) -> bool {
         let mut q = [[0u8; NUM_BYTES]; 2];
         let mut tmp = [[0u8; NUM_BYTES]; 2];
         let mut chi = vec![[0u8; NUM_BYTES]; BLOCK_SIZE];
         q[0] = [0u8; NUM_BYTES];
         q[1] = [0u8; NUM_BYTES];
 
-        seed2 = io.receive_block::<16>().expect("Failed to receive seed")[0];
-        io.flush();
+        let seed2 = io.receive_block::<16>().expect("Failed to receive seed")[0];
+        io.flush().expect("Failed to flush IO");
 
         // println!("Seed received: {:?}", seed2);
 
@@ -274,11 +271,11 @@ impl IKNP {
         vector_inn_prdt_sum_no_red(&mut tmp, &chi, &self.local_out);
         xor_blocks(&mut q, &tmp);
 
-        x = io.receive_block::<NUM_BYTES>().expect("Failed to receive x")[0];
+        let x = io.receive_block::<NUM_BYTES>().expect("Failed to receive x")[0];
         // Receive t
         let received_data = io.receive_block::<NUM_BYTES>().expect("Failed to receive t");
         assert_eq!(received_data.len(), 2, "Expected exactly 2 elements in received data");
-        t = [received_data[0], received_data[1]]; // Convert Vec to array
+        let t = [received_data[0], received_data[1]]; // Convert Vec to array
 
         let delta = self.delta.expect("Delta must be set during setup");
         mul128(&x, &delta, &mut tmp);
@@ -289,7 +286,6 @@ impl IKNP {
 
     pub fn recv_check<IO: CommunicationChannel>(&mut self, io: &mut IO, out: &[[u8; NUM_BYTES]], r: &[bool], length: usize, comm: &mut u64) {
         let select = [[0u8; NUM_BYTES], [255u8; NUM_BYTES]]; // zero_block and all_one_block
-        let mut seed2 = [0u8; 16];
         let mut x = [0u8; NUM_BYTES];
         let mut t = [[0u8; NUM_BYTES]; 2];
         let mut tmp = [[0u8; NUM_BYTES]; 2];
@@ -300,10 +296,10 @@ impl IKNP {
         let mut prg = PRG::new(None, 0); // random key PRG
         let mut tmp_seed2 = [[0u8; 16]];
         prg.random_16byte_block(&mut tmp_seed2);
-        seed2 = tmp_seed2[0];
+        let seed2 = tmp_seed2[0];
 
         *comm += io.send_block::<16>(&[seed2]).expect("Failed to send seed");
-        io.flush();
+        io.flush().expect("Failed to flush IO");
 
         let mut chi_prg = PRG::new(Some(&seed2), 0);
 

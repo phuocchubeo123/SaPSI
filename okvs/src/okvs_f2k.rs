@@ -1,10 +1,10 @@
-use crate::types::Pair;
 use crate::error::{Error, Result};
 use crate::utils::{radix_sort, MASK};
 use std::convert::TryInto;
-use std::ops::{BitXor, Shl, Shr};
 use sp_core::U256;
 use blake3;
+
+pub type Pair<K, V> = (K, V);
 
 const EPSILON: f64 = 1.0; // can change
 const BAND_WIDTH: usize = 200; // can change

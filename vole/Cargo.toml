@@ -49,22 +49,10 @@ name = "base_svole"
 name = "test_mul"
 
 [[bin]]
-name = "spfss"
-
-[[bin]]
-name = "mpfss"
-
-[[bin]]
-name = "vole_triple"
-
-[[bin]]
 name = "test_block"
 
 [[bin]]
 name = "test_fri"
-
-[[bin]]
-name = "oprf"
 
 [[bin]]
 name = "test_rayon"

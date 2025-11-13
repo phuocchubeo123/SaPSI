@@ -7,7 +7,5 @@ extern crate rayon;
 extern crate blake3;
 
 pub mod error;
-pub mod types;
-pub mod okvs;
 pub mod okvs_f2k;
 pub mod utils;
