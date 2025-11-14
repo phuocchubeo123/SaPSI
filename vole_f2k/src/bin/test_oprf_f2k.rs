@@ -3,7 +3,7 @@ extern crate psi_volef2k;
 extern crate rand;
 extern crate rand_chacha;
 
-use psi_network::socket_channel::TcpChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_network::comm_channel::CommunicationChannel;
 use psi_volef2k::oprf_sender_f2k::OprfSenderF2k;
 use psi_volef2k::oprf_receiver_f2k::OprfReceiverF2k;
@@ -24,7 +24,7 @@ pub fn gen_input(rng: &mut ChaCha12Rng) -> u128 {
 fn main() {
     let role = std::env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
 
-    const size: usize = 1 << 5;
+    const SIZE: usize = 1 << 5;
     const KEY_DIM: usize = 2;
     let mut comm: u64 = 0;
 
@@ -37,12 +37,12 @@ fn main() {
 
         let seed = channel.receive_block::<32>().expect("Failed to receive seed from sender");
         let mut rng = ChaCha12Rng::from_seed(seed[0]);
-        let data = (0..size).map(|_| {
+        let data = (0..SIZE).map(|_| {
             let x: [u128; KEY_DIM] = (0..KEY_DIM).map(|_| gen_input(&mut rng)).collect::<Vec<u128>>().try_into().unwrap();
             x
         }).collect::<Vec<[u128; KEY_DIM]>>();
 
-        let mut oprf = OprfReceiverF2k::<KEY_DIM>::new(&mut channel, size, LPN16, &mut comm);
+        let mut oprf = OprfReceiverF2k::<KEY_DIM>::new(&mut channel, SIZE, LPN16, &mut comm);
         oprf.receive(&mut channel, &data, &mut comm);
 
         data.iter().for_each(|x| {
@@ -60,12 +60,12 @@ fn main() {
         rng_seed.fill(&mut seed);
         channel.send_block::<32>(&[seed]).expect("Failed to send seed to receiver");
         let mut rng = ChaCha12Rng::from_seed(seed);
-        let data = (0..2*size).map(|_| {
+        let data = (0..2*SIZE).map(|_| {
             let x: [u128; KEY_DIM] = (0..KEY_DIM).map(|_| gen_input(&mut rng)).collect::<Vec<u128>>().try_into().unwrap();
             x
         }).collect::<Vec<[u128; KEY_DIM]>>();
 
-        let mut oprf = OprfSenderF2k::<KEY_DIM>::new(&mut channel, size, LPN16, &mut comm);
+        let mut oprf = OprfSenderF2k::<KEY_DIM>::new(&mut channel, SIZE, LPN16, &mut comm);
         oprf.send(&mut channel, &data, &mut comm);
 
         data.iter().for_each(|x| {

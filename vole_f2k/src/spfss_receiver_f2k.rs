@@ -1,6 +1,6 @@
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_ot::pre_ot::OTPre;
-use psi_aes::{prp, two_key_prp::TwoKeyPRPF2k};
+use psi_aes::{two_key_prp::TwoKeyPRPF2k};
 use blake3;
 use psi_utils::gf128::{gf128mul, uni_hash_coeff_gen_f2k, vector_inner_product_f2k};
 pub struct SpfssRecverF2k {
@@ -38,9 +38,10 @@ impl SpfssRecverF2k {
         choice_pos
     }
 
-    pub fn recv<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<1>, s: usize, comm: &mut u64) {
+    pub fn recv(&mut self, io: &mut TcpChannel, ot: &mut OTPre<1>, s: usize) {
         let mut receive_data = vec![[0u128; 1]; self.depth - 1];
-        ot.recv(io, &mut receive_data, &mut self.b, self.depth - 1, s, comm);
+        ot.recv(io, &mut receive_data, &mut self.b, self.depth - 1, s)
+            .expect("OT receive failed");
 
         self.m = receive_data
             .iter()
@@ -113,7 +114,7 @@ impl SpfssRecverF2k {
         }
     }
 
-    pub fn consistency_check<IO: CommunicationChannel>(&self, io: &mut IO, z: u128, beta: u128, comm: &mut u64) {
+    pub fn consistency_check(&self, io: &mut TcpChannel, z: u128, beta: u128) {
         let hash = blake3::hash(&self.share.to_le_bytes());
         let mut hash_bytes = [0u8; 16];
         hash_bytes.copy_from_slice(&hash.as_bytes()[0..16]);
@@ -122,7 +123,7 @@ impl SpfssRecverF2k {
         uni_hash_coeff_gen_f2k(&mut chi, uni_hash_seed, self.leave_n);
         // Compute and send x_star
         let x_star = gf128mul(chi[self.choice_pos], beta) ^ beta;
-        *comm += io.send_block::<16>(&[x_star.to_le_bytes()]).expect("Failed to send x_star"); 
+        io.send_block::<16>(&[x_star.to_le_bytes()]).expect("Failed to send x_star"); 
         // Compute W 
         let w = vector_inner_product_f2k(&chi, &self.ggm_tree) ^ z;
         // Receive and check V

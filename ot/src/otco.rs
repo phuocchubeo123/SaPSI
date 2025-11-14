@@ -1,9 +1,13 @@
 #![allow(non_snake_case)]
 
+use crate::comm_utils::{send_point, receive_point};
 use psi_aes::hash::Hash;
-use psi_network::comm_channel::CommunicationChannel;
-use p256::elliptic_curve::sec1::{ToEncodedPoint, FromEncodedPoint};
-use p256::elliptic_curve::{Field, Group}; 
+use psi_network::tcp_channel::TcpChannel;
+use p256::elliptic_curve::{
+    sec1::{ToEncodedPoint, FromEncodedPoint},
+    Field, Group, 
+    rand_core::OsRng,
+};
 use p256::{Scalar, AffinePoint, ProjectivePoint};
 
 pub struct OTCO {
@@ -16,9 +20,9 @@ impl OTCO {
 
     /// Sender's OT implementation
     /// Messages are always 128 bits long [u8; 16]
-    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, data0: &[[u8; 16]], data1: &[[u8; 16]], comm: &mut u64) {
+    pub fn send(&mut self, io: &mut TcpChannel, data0: &[[u8; 16]], data1: &[[u8; 16]]) {
         let length = data0.len();
-        let mut rng = rand::thread_rng();
+        let mut rng = OsRng;
 
         // Generate random scalar `a`
         let a = Scalar::random(&mut rng);
@@ -29,7 +33,8 @@ impl OTCO {
 
         // Send A to the receiver
         let A_encoded = A_affine.to_encoded_point(false);
-        *comm += io.send_point(&A_encoded).expect("Cannot send encoded A in OTCO");
+        send_point(&A_encoded, io).expect("Cannot send encoded A");
+
 
         // Compute (A * a)^-1
         let mut A_a_inverse = A * a;
@@ -40,7 +45,7 @@ impl OTCO {
 
         // Receive B points and compute BA points
         for i in 0..length {
-            let b_point = io.receive_point().expect("Cannot receive b_point");
+            let b_point = receive_point(io).expect("Cannot receive encoded B");
             let b_affine = AffinePoint::from_encoded_point(&b_point).unwrap();
                 // .expect("Failed to decode AffinePoint from EncodedPoint");
             let B_projective = ProjectivePoint::from(b_affine);
@@ -51,11 +56,6 @@ impl OTCO {
 
             // Compute BA[i] = B[i] + (A * a)^-1
             BA_points[i] = B_a + A_a_inverse;
-        }
-
-        let io_flush = io.flush();
-        if io_flush.is_err() {
-            println!("Error flushing IO: {:?}", io_flush);
         }
 
         // Encrypt and send the data
@@ -72,20 +72,20 @@ impl OTCO {
             let encrypted0 = xor_blocks(&data0[i], &key_b);
             let encrypted1 = xor_blocks(&data1[i], &key_ba);
 
-            *comm += io.send_block::<16>(&[encrypted0, encrypted1]).expect("Cannot send encrypted data in OTCO sender.");
+            io.send_block::<16>(&[encrypted0, encrypted1]).expect("Cannot send encrypted data in OTCO sender.");
         }
     }
 
     /// Receiver's OT implementation
     /// Messages are always 128 bits long [u8; 16]
-    pub fn recv<IO: CommunicationChannel>(&mut self, io: &mut IO, choices: &[bool], output: &mut Vec<[u8; 16]>, comm: &mut u64) {
+    pub fn recv(&mut self, io: &mut TcpChannel, choices: &[bool], output: &mut Vec<[u8; 16]>) {
         let length = choices.len();
-        let mut rng = rand::thread_rng();
+        let mut rng = OsRng;
 
         // Generate random scalars `b`
         let b_scalars: Vec<Scalar> = (0..length).map(|_| Scalar::random(&mut rng)).collect();
 
-        let A_encoded = io.receive_point().expect("Cannot receive encoded A");
+        let A_encoded = receive_point(io).expect("Cannot receive encoded A");
         let A_affine = AffinePoint::from_encoded_point(&A_encoded).unwrap();
             // .expect("Invalid A point received");
         let A_projective = ProjectivePoint::from(A_affine);
@@ -100,12 +100,7 @@ impl OTCO {
             }
 
             let B_encoded = B_projective.to_affine().to_encoded_point(false);
-            *comm += io.send_point(&B_encoded).expect("Cannot send B encoded");
-        }
-
-        let io_flush = io.flush();
-        if io_flush.is_err() {
-            println!("Error flushing IO: {:?}", io_flush);
+            send_point(&B_encoded, io).expect("Cannot send B encoded");
         }
 
         // Compute shared points and decrypt data

@@ -1,7 +1,7 @@
 extern crate psi_volef2k;
 extern crate psi_network;
 
-use psi_network::socket_channel::TcpChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_volef2k::cope_f2k::CopeF2k;
 use psi_volef2k::utils_f2k::rand_u128;
 use std::time::Instant;
@@ -9,6 +9,7 @@ use std::time::Instant;
 fn main() {
     let role = std::env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
     let mut comm: u64 = 0;
+    const BATCH_SIZE: usize = 20000;
 
     if role == "receiver" {
         // Receiver logic
@@ -29,15 +30,14 @@ fn main() {
         let start = Instant::now();
 
         // Test extend_batch
-        let batch_size = 20000;
-        let u_batch: Vec<u128> = (0..batch_size).map(|_| rand_u128()).collect();
-        let mut batch_result = vec![0u128; batch_size];
-        receiver_cope.extend_receiver_batch(&mut channel, &mut batch_result, &u_batch, batch_size, &mut comm);
+        let u_batch: Vec<u128> = (0..BATCH_SIZE).map(|_| rand_u128()).collect();
+        let mut batch_result = vec![0u128; BATCH_SIZE];
+        receiver_cope.extend_receiver_batch(&mut channel, &mut batch_result, &u_batch, BATCH_SIZE, &mut comm);
 
         let duration = start.elapsed();
         println!("Time taken: {:?}", duration);
 
-        receiver_cope.check_triple(&mut channel, &u_batch, &batch_result, batch_size);
+        receiver_cope.check_triple(&mut channel, &u_batch, &batch_result, BATCH_SIZE);
     } else if role == "sender" {
         let stream = std::net::TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
         let mut channel = TcpChannel::new(stream);
@@ -52,12 +52,11 @@ fn main() {
 
         let start = Instant::now();
         // Test extend_batch
-        let batch_size = 20000;
-        let mut batch_result = vec![0u128; batch_size];
-        sender_cope.extend_sender_batch(&mut channel, &mut batch_result, batch_size, &mut comm);
+        let mut batch_result = vec![0u128; BATCH_SIZE];
+        sender_cope.extend_sender_batch(&mut channel, &mut batch_result, BATCH_SIZE, &mut comm);
         let duration = start.elapsed();
         println!("Time taken: {:?}", duration);
 
-        sender_cope.check_triple(&mut channel, &[delta], &batch_result, batch_size);
+        sender_cope.check_triple(&mut channel, &[delta], &batch_result, BATCH_SIZE);
     }
 }

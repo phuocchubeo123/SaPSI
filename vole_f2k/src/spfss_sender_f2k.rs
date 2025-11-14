@@ -3,7 +3,7 @@ use std::vec;
 use psi_aes::prg::PRG;
 use psi_aes::two_key_prp::TwoKeyPRPF2k;
 use psi_utils::gf128::{gf128mul, uni_hash_coeff_gen_f2k, vector_inner_product_f2k};
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_ot::pre_ot::OTPre;
 use blake3;
 
@@ -44,7 +44,7 @@ impl SpfssSenderF2k {
         self.ggm_tree_gen(ggm_tree_mem, secret, gamma);
     }
 
-    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<1>, s: usize, comm: &mut u64) {
+    pub fn send(&mut self, io: &mut TcpChannel, ot: &mut OTPre<1>, s: usize) {
         let ot_msg_0: Vec<[u128; 1]> = self.m0
             .iter()
             .map(|&x| [x; 1])
@@ -53,8 +53,8 @@ impl SpfssSenderF2k {
             .iter()
             .map(|&x| [x; 1])
             .collect();
-        ot.send(io, &ot_msg_0, &ot_msg_1, self.depth - 1, s, comm);
-        *comm += io.send_block::<16>(&[self.secret_sum.to_le_bytes()]).expect("Failed to send secret sum");
+        ot.send(io, &ot_msg_0, &ot_msg_1, self.depth - 1, s);
+        io.send_block::<16>(&[self.secret_sum.to_le_bytes()]).expect("Failed to send secret sum");
     }
 
     fn ggm_tree_gen(&mut self, ggm_tree_mem: &mut [u128], secret: u128, gamma: u128) {
@@ -86,7 +86,7 @@ impl SpfssSenderF2k {
         self.ggm_tree.copy_from_slice(&ggm_tree_mem[..self.leave_n]);
     }
 
-    pub fn consistency_check<IO: CommunicationChannel>(&self, io: &mut IO, y: u128, comm: &mut u64) {
+    pub fn consistency_check(&self, io: &mut TcpChannel, y: u128) {
         // z = y + delta * beta
 
         let hash = blake3::hash(&self.secret_sum.to_le_bytes());
@@ -101,7 +101,7 @@ impl SpfssSenderF2k {
         let y_star = y ^ gf128mul(self.delta, x_star);
         let v = vector_inner_product_f2k(&chi, &self.ggm_tree) ^ y_star;
         
-        *comm += io.send_block::<16>(&[v.to_le_bytes()]).expect("Failed to send V");
+        io.send_block::<16>(&[v.to_le_bytes()]).expect("Failed to send V");
     }
 
     pub fn consistency_check_msg_gen(&self, v: &mut u128, seed: u128) {

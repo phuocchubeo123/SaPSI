@@ -3,7 +3,7 @@ extern crate psi_ot;
 extern crate psi_volef2k;
 extern crate psi_utils;
 
-use psi_network::socket_channel::TcpChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_network::comm_channel::CommunicationChannel;    
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;

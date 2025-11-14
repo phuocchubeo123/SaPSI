@@ -2,20 +2,17 @@ extern crate psi_ot;
 extern crate psi_network;
 extern crate rand;
 
-use psi_network::comm_channel::CommunicationChannel;
-use psi_network::socket_channel::TcpChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use std::net::TcpStream;
 use std::env;
 use std::net::TcpListener;
 use std::time::Instant;
-use rand::random;
 
 fn main() {
     // Get the role argument (sender or receiver)
     let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
-    let mut comm: u64 = 0;
 
     if role == "receiver" {
         // Listen for the sender
@@ -28,31 +25,28 @@ fn main() {
         let mut receiver_cot = BaseCot::new(1, false);
 
         // Set up the receiver's precomputation phase
-        receiver_cot.cot_gen_pre(&mut channel, None, &mut comm);
+        receiver_cot.cot_gen_pre(&mut channel, None);
 
         // Original COT generation
         let size = 60; // Number of COTs
         let times = 100;
-        let mut original_ot_data = vec![[0u8; 32]; size];
         let mut choice_bits = vec![false; size];
         for bit in &mut choice_bits {
             *bit = rand::random();
         }
 
         let mut receiver_pre_ot = OTPre::<2>::new(size, times);
-        receiver_cot.cot_gen_preot(&mut channel, &mut receiver_pre_ot, size * times, None, &mut comm);
+        receiver_cot.cot_gen_preot(&mut channel, &mut receiver_pre_ot, size * times, None);
 
         let start = Instant::now();
-        for s in 0..times {
-            receiver_pre_ot.choices_recver(&mut channel, &choice_bits, &mut comm);
+        for _ in 0..times {
+            receiver_pre_ot.choices_recver(&mut channel, &choice_bits);
         }
-        channel.flush();
         receiver_pre_ot.reset();
         // Receive data using OTPre
         for s in 0..times {
-            let idx = (s * 37) % size;
             let mut received_data = vec![[0u128; 2]; size];
-            receiver_pre_ot.recv(&mut channel, &mut received_data, &choice_bits, size, s, &mut comm);
+            receiver_pre_ot.recv(&mut channel, &mut received_data, &choice_bits, size, s);
 
             for i in 0..size {
                 println!("OT number: {}", s * size + i);
@@ -62,6 +56,8 @@ fn main() {
 
         let duration = start.elapsed();
         println!("Time taken: {:?}", duration);
+        println!("Total data sent: {} bytes", channel.get_bytes_sent());
+        println!("Total data received: {} bytes", channel.get_bytes_received());
     } else if role == "sender" {
         // Connect to the receiver
         let stream = TcpStream::connect("127.0.0.1:8080").expect("Failed to connect to receiver");
@@ -71,19 +67,17 @@ fn main() {
         let mut sender_cot = BaseCot::new(0, false);
 
         // Set up the sender's precomputation phase
-        sender_cot.cot_gen_pre(&mut channel, None, &mut comm);
+        sender_cot.cot_gen_pre(&mut channel, None);
 
         // Original COT generation
         let size = 60; // Number of COTs
         let times = 100;
-        let mut original_ot_data = vec![[0u128; 2]; size];
 
         let mut sender_pre_ot = OTPre::<2>::new(size, times);
-        sender_cot.cot_gen_preot(&mut channel, &mut sender_pre_ot, size*times, None, &mut comm);
-        for s in 0..times {
-            sender_pre_ot.choices_sender(&mut channel, &mut comm);
+        sender_cot.cot_gen_preot(&mut channel, &mut sender_pre_ot, size*times, None);
+        for _ in 0..times {
+            sender_pre_ot.choices_sender(&mut channel);
         }
-        channel.flush();
         sender_pre_ot.reset();
 
         for s in 0..times {
@@ -94,7 +88,7 @@ fn main() {
                 m0[i] = [s as u128; 2];
                 m1[i] = [(s + 1) as u128; 2];
             }
-            sender_pre_ot.send(&mut channel, &m0, &m1, size, s, &mut comm);
+            sender_pre_ot.send(&mut channel, &m0, &m1, size, s);
 
             for i in 0..size {
                 println!("OT number: {}", s*size + i);
@@ -103,10 +97,9 @@ fn main() {
             }
         }
 
-
+        println!("Total data sent: {} bytes", channel.get_bytes_sent());
+        println!("Total data received: {} bytes", channel.get_bytes_received());
     } else {
         panic!("Invalid role specified. Please specify 'sender' or 'receiver'.");
     }
-
-    println!("Total data sent: {} bytes", comm);
 }

@@ -7,8 +7,7 @@ extern crate rand_chacha;
 use psi_sa::config::*;
 use psi_sa::psi_sender::SAPSISender;
 use psi_sa::psi_receiver::SAPSIReceiver;
-use psi_network::socket_channel::TcpChannel;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_volef2k::vole_triple_f2k::{LPN12, LPN16, LPN20};
 use std::env;
 use std::net::{TcpListener, TcpStream};
@@ -56,14 +55,14 @@ fn main() {
     let port = env::args().nth(2).expect("Please specify the port as an argument");
     let mut comm: u64 = 0;
 
-    const size: usize = N;
-    const table_size: usize = ((size as f32) * 1.5) as usize;
+    const SIZE: usize = N;
+    const TABLE_SIZE: usize = ((SIZE as f32) * 1.5) as usize;
     let mut param = LPN12;
-    if size == 1 << 8 {
+    if SIZE == 1 << 8 {
         param = LPN12;
-    } else if size == 1 << 12 {
+    } else if SIZE == 1 << 12 {
         param = LPN16;
-    } else if size == 1 << 16 {
+    } else if SIZE == 1 << 16 {
         param = LPN20;
     } else {
         panic!("Invalid size, only accept 2^8, 2^12, or 2^16");

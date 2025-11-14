@@ -7,7 +7,7 @@ use psi_sa::idcf_sender::IDCFSender;
 use psi_sa::idcf_receiver::IDCFReceiver;    
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
-use psi_network::socket_channel::TcpChannel;
+use psi_network::tcp_channel::TcpChannel;
 use std::env;
 use std::net::{TcpListener, TcpStream};
 use rand::prelude::*;
@@ -16,8 +16,8 @@ fn main() {
     let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
     let mut comm: u64 = 0;
 
-    const depth: usize = 5;
-    let mut idcf_sharing = [[0u8; 16]; 1 << (depth + 1)];
+    const DEPTH: usize = 5;
+    let mut idcf_sharing = [[0u8; 16]; 1 << (DEPTH + 1)];
     
     if role == "receiver" {
         println!("Starting as Receiver...");

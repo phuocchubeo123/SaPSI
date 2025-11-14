@@ -98,7 +98,7 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
     fn simple_gauss(
         &self,
         mut y: Vec<u128>,
-        mut bands: Vec<U256>,
+        bands: Vec<U256>,
         start_pos: Vec<usize>,
         band_width: usize,
     ) -> Result<Vec<u128>> {

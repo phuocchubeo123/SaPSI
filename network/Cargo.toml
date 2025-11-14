@@ -9,4 +9,4 @@ path = "src/lib.rs"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 p256 = { version = "0.13.2", features = ["ecdh"] }
-lambdaworks-math = { git = "https://github.com/lambdaclass/lambdaworks.git", package = "lambdaworks-math" }
+anyhow = "1.0"

@@ -1,7 +1,7 @@
 extern crate psi_network;
 extern crate psi_volef2k;
 
-use psi_network::socket_channel::TcpChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_volef2k::base_svole_f2k::BaseSvoleF2k;
 use psi_volef2k::utils_f2k::rand_u128;
 use std::net::{TcpListener, TcpStream};

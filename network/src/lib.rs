@@ -1,5 +1,3 @@
-extern crate p256;
-extern crate lambdaworks_math;
+extern crate anyhow;
 
-pub mod comm_channel;
-pub mod socket_channel;
+pub mod tcp_channel;

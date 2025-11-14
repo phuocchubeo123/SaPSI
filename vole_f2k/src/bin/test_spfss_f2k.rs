@@ -8,8 +8,7 @@ use std::time::Instant;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
 use psi_utils::gf128::gf128mul;
-use psi_network::socket_channel::TcpChannel;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_volef2k::spfss_sender_f2k::SpfssSenderF2k;
 use psi_volef2k::spfss_receiver_f2k::SpfssRecverF2k;
 use psi_volef2k::utils_f2k::rand_u128;
@@ -18,6 +17,7 @@ use rand::RngCore;
 fn main() {
     let role = std::env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
     let mut comm: u64 = 0;
+    const DEPTH: usize = 4;
 
     if role == "receiver" {
         // Receiver logic
@@ -32,8 +32,7 @@ fn main() {
         receiver_cot.cot_gen_pre(&mut channel, None, &mut comm);
 
         // Original COT generation
-        const depth: usize = 4;
-        let size = depth - 1; // Number of COTs
+        let size = DEPTH - 1; // Number of COTs
         let times = 100;
         let mut choice_bits = vec![false; size * times];
         // Populate random choice bits
@@ -50,21 +49,20 @@ fn main() {
         let gamma_bytes = channel.receive_block::<16>().expect("Failed to receive gamma");
         let gamma = u128::from_le_bytes(gamma_bytes[0]);
 
-        let mut ggm_tree_mem = [0u128; 1 << (depth - 1)];
+        let mut ggm_tree_mem = [0u128; 1 << (DEPTH - 1)];
         for i in 0..times {
-            receiver_pre_ot.choices_recver(&mut channel, &[false; depth - 1], &mut comm);
+            receiver_pre_ot.choices_recver(&mut channel, &[false; DEPTH - 1], &mut comm);
         }
-        channel.flush();
         receiver_pre_ot.reset();
 
         for i in 0..times {
             let beta = rand_u128();
             let delta2 = gamma ^ gf128mul(delta, beta);
 
-            let mut receiver_spfss_f2k = SpfssRecverF2k::new(depth);
+            let mut receiver_spfss_f2k = SpfssRecverF2k::new(DEPTH);
             receiver_spfss_f2k.recv(&mut channel, &mut receiver_pre_ot, i, &mut comm);
             receiver_spfss_f2k.compute(&mut ggm_tree_mem, delta2);
-            receiver_spfss_f2k.consistency_check(&mut channel, ggm_tree_mem[(1 << (depth - 1)) - 1], beta, &mut comm);
+            receiver_spfss_f2k.consistency_check(&mut channel, ggm_tree_mem[(1 << (DEPTH - 1)) - 1], beta, &mut comm);
         }
     } else if role == "sender" {
         // Connect to the receiver
@@ -72,8 +70,7 @@ fn main() {
         let mut channel = TcpChannel::new(stream);
         let mut sender_cot = BaseCot::new(0, false);
         sender_cot.cot_gen_pre(&mut channel, None, &mut comm);
-        const depth: usize = 4;
-        let size = depth - 1; // Number of COTs
+        let size = DEPTH - 1; // Number of COTs
         let times = 100;
         let mut choice_bits = vec![false; size * times];
         // Populate random choice bits
@@ -93,21 +90,19 @@ fn main() {
         channel.send_block::<16>(&[gamma_bytes]).expect("Failed to send gamma");
 
 
-        let mut ggm_tree_mem = [0u128; 1 << (depth - 1)];
+        let mut ggm_tree_mem = [0u128; 1 << (DEPTH - 1)];
 
         let start = Instant::now();
         for i in 0..times {
             sender_pre_ot.choices_sender(&mut channel, &mut comm);
         }
-        channel.flush();
         sender_pre_ot.reset();
 
         for i in 0..times {
-            let mut sender_spfss_f2k = SpfssSenderF2k::new(depth);
+            let mut sender_spfss_f2k = SpfssSenderF2k::new(DEPTH);
             sender_spfss_f2k.compute(&mut ggm_tree_mem, delta, gamma);
             sender_spfss_f2k.send(&mut channel, &mut sender_pre_ot, i, &mut comm);
             sender_spfss_f2k.consistency_check(&mut channel, ggm_tree_mem[0], &mut comm);
-            channel.flush();
         }
 
         println!("Time taken: {:?}", start.elapsed());

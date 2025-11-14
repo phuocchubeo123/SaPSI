@@ -1,5 +1,5 @@
 use psi_aes::ccrh::CCRH;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 
 // Section 6.1 of https://eprint.iacr.org/2019/074.pdf
 // We extend the OT message length by first preparing short OT messages as keys
@@ -84,7 +84,7 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
     }
 
     // Spend one more round to send the choice bits
-    pub fn choices_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, _comm: &mut u64) {
+    pub fn choices_sender(&mut self, io: &mut TcpChannel) {
         let received_bits = io.receive_bits().expect("Failed to receive bits");
         for (i, &bit) in received_bits.iter().enumerate() {
             self.bits[self.count + i] = bit;
@@ -92,27 +92,26 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
         self.count += self.length;
     }
 
-    pub fn choices_recver<IO: CommunicationChannel>(&mut self, io: &mut IO, choices: &[bool], comm: &mut u64) {
+    pub fn choices_recver(&mut self, io: &mut TcpChannel, choices: &[bool]) {
         let mut adjusted_bits = vec![false; self.length];
         for i in 0..self.length {
             adjusted_bits[i] = choices[i] ^ self.bits[self.count + i];
             self.bits[self.count+i] = adjusted_bits[i].clone();
         }
-        *comm += io.send_bits(&adjusted_bits).expect("Failed to send bits");
+        io.send_bits(&adjusted_bits).expect("Failed to send bits");
         self.count += self.length;
     }
 
 
     /// Send data based on precomputed values
     /// TODO: Change to arbitrary message length
-    pub fn send<IO: CommunicationChannel>(
+    pub fn send(
         &mut self,
-        io: &mut IO,
+        io: &mut TcpChannel,
         m0: &[[u128; NUM_LIMBS]],
         m1: &[[u128; NUM_LIMBS]],
         length: usize,
         s: usize,
-        comm: &mut u64,
     ) {
         let mut pad = vec![[0u128; NUM_LIMBS]; 2*length];
         let k = s * length;
@@ -127,18 +126,17 @@ impl<const NUM_LIMBS: usize> OTPre<NUM_LIMBS> {
                 pad[2*i+1] = xor_message::<NUM_LIMBS>(&m1[i], &self.pre_data[idx]);
             }
         }
-        *comm += io.send_16byte_block::<NUM_LIMBS>(&pad).expect("Failed to send padded data");
+        io.send_16byte_block::<NUM_LIMBS>(&pad).expect("Failed to send padded data");
     }
 
     /// Receive and reconstruct data based on precomputed values
-    pub fn recv<IO: CommunicationChannel>(
+    pub fn recv(
         &mut self,
-        io: &mut IO,
+        io: &mut TcpChannel,
         data: &mut [[u128; NUM_LIMBS]],
         b: &[bool],
         length: usize,
         s: usize,
-        comm: &mut u64,
     ) {
         let pad = io.receive_16byte_block::<NUM_LIMBS>().expect("Receive padded data failed");
         let k = s * length;
