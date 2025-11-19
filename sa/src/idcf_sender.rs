@@ -1,11 +1,9 @@
 use aes::Aes128;
 use aes::cipher::{KeyInit, BlockEncrypt, generic_array::GenericArray};
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_ot::pre_ot::OTPre;
 use psi_aes::prg::PRG;
 use std::convert::TryInto;
-use std::f32::consts::E;
-use std::time::Instant;
 
 const NUM_BYTES: usize = 16;
 const OT_NUM_BYTES: usize = NUM_BYTES * 3;
@@ -46,8 +44,8 @@ impl IDCFSender {
     }
 
     /// Send OT messages and secret sum.
-    pub fn send<IO: CommunicationChannel>(&self, io: &mut IO, ot: &mut OTPre<3>, comm: &mut u64) {
-        ot.choices_sender(io, comm);
+    pub fn send(&self, io: &mut TcpChannel, ot: &mut OTPre<3>) {
+        ot.choices_sender(io);
         ot.reset();
         let mut ot_msg_0 = vec![[0u128; 3]; (self.depth + 1) * self.times];
         for time in 0..self.times {
@@ -62,7 +60,7 @@ impl IDCFSender {
             }
         }
 
-        ot.send(io, &ot_msg_0, &ot_msg_1, (self.depth + 1) * self.times, 0, comm);
+        ot.send(io, &ot_msg_0, &ot_msg_1, (self.depth + 1) * self.times, 0);
     }
 
     pub fn idcf_gen(&mut self, idcf_sharing: &mut [[u8; NUM_BYTES]], key: [u8; NUM_BYTES], time: usize) {
@@ -75,10 +73,10 @@ impl IDCFSender {
         kg1[0] = 1u8;
         kc0[0] = 2u8;
         kc1[0] = 3u8;
-        let mut g0 = Aes128::new(GenericArray::from_slice(&kg0));
-        let mut g1 = Aes128::new(GenericArray::from_slice(&kg1));
-        let mut c0 = Aes128::new(GenericArray::from_slice(&kc0));
-        let mut c1 = Aes128::new(GenericArray::from_slice(&kc1));
+        let g0 = Aes128::new(GenericArray::from_slice(&kg0));
+        let g1 = Aes128::new(GenericArray::from_slice(&kg1));
+        let c0 = Aes128::new(GenericArray::from_slice(&kc0));
+        let c1 = Aes128::new(GenericArray::from_slice(&kc1));
 
         // The root of the base GGM tree is the secret (seed)
         self.base_ggm_tree[time][0] = key.clone();
@@ -182,7 +180,7 @@ impl IDCFSender {
     }
 
     // Only for debug
-    pub fn consistency_check<IO: CommunicationChannel>(&self, io: &mut IO, idcf_sharing: &[[u8; NUM_BYTES]], time: usize) {
+    pub fn consistency_check(&self, io: &mut TcpChannel, idcf_sharing: &[[u8; NUM_BYTES]], time: usize) {
         io.send_u8(&self.beta[time]).expect("Failed to send beta for testing");
         io.send_block::<NUM_BYTES>(idcf_sharing).unwrap();
     }

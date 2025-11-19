@@ -7,10 +7,9 @@ extern crate rand_chacha;
 use psi_sa::config::*;
 use psi_sa::psi_sender::SAPSISender;
 use psi_sa::psi_receiver::SAPSIReceiver;
-use psi_network::tcp_channel::TcpChannel;
+use psi_network::tcp_channel::{connect_with_retry_tcp, listen_tcp};
 use psi_volef2k::vole_triple_f2k::{LPN12, LPN16, LPN20};
 use std::env;
-use std::net::{TcpListener, TcpStream};
 use std::collections::HashSet;
 use std::time::Instant;
 use rand::prelude::*;
@@ -53,20 +52,18 @@ fn get_origin(point: &[u128; DIMENSION]) -> [u128; DIMENSION] {
 fn main() {
     let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
     let port = env::args().nth(2).expect("Please specify the port as an argument");
-    let mut comm: u64 = 0;
 
     const SIZE: usize = N;
     const TABLE_SIZE: usize = ((SIZE as f32) * 1.5) as usize;
-    let mut param = LPN12;
-    if SIZE == 1 << 8 {
-        param = LPN12;
-    } else if SIZE == 1 << 12 {
-        param = LPN16;
-    } else if SIZE == 1 << 16 {
-        param = LPN20;
-    } else {
-        panic!("Invalid size, only accept 2^8, 2^12, or 2^16");
-    }
+    let param = if SIZE == 1 << 8 {
+            LPN12
+        } else if SIZE == 1 << 12 {
+            LPN16
+        } else if SIZE == 1 << 16 {
+            LPN20
+        } else {
+            panic!("Invalid size, only accept 2^8, 2^12, or 2^16");
+        };
 
     if RADIUS == 10 {
         if RANGE_BITS != 6 {
@@ -107,21 +104,16 @@ fn main() {
         panic!("Invalid RADIUS");
     }
 
-    println!("Running PSI with size: {}, table_size: {}, radius: {}, dimension: {}", size, table_size, RADIUS, DIMENSION);
+    println!("Running PSI with size: {}, table_size: {}, radius: {}, dimension: {}", SIZE, TABLE_SIZE, RADIUS, DIMENSION);
 
     if role == "receiver" {
         println!("Starting as Receiver...");
-        let listener = TcpListener::bind(format!("127.0.0.1:{}", port))
-            .expect("Failed to bind to port");
-        let (stream, _) = listener.accept().expect("Failed to accept connection");
-        let mut channel = TcpChannel::new(stream);
+        let mut channel = listen_tcp(&format!("127.0.0.1:{}", port)).expect("Failed to listen on port");
 
         let seed = channel.receive_block::<32>().expect("Failed to receive seed from receiver");
         let mut rng = ChaCha12Rng::from_seed(seed[0]);
-        let origins = gen_origins(&mut rng, size);
+        let origins = gen_origins(&mut rng, SIZE);
         let mut data: Vec<[u128; DIMENSION]> = Vec::new();
-
-        let mut intersection_size = 0;
 
         origins.iter().for_each(|origin| {
             let mut point = gen_input(&mut rng);
@@ -147,14 +139,13 @@ fn main() {
 
         let start = Instant::now();
 
-        let mut receiver_psi = SAPSIReceiver::new(size, table_size);
-        receiver_psi.receive(&mut channel, &data, param, &mut comm);
+        let receiver_psi = SAPSIReceiver::new(TABLE_SIZE);
+        receiver_psi.receive(&mut channel, &data, param);
 
         println!("Receiver finished in {:?}", start.elapsed());
-        println!("Total communication: {} bytes", comm);
+        println!("Total communication: {} bytes", channel.get_bytes_sent());
     } else if role == "sender" {
-        let stream = TcpStream::connect(format!("127.0.0.1:{}", port)).expect("Failed to connect to receiver");
-        let mut channel = TcpChannel::new(stream);
+        let mut channel = connect_with_retry_tcp(&format!("127.0.0.1:{}", port)).expect("Failed to connect to receiver");
 
         let mut seed = [2u8; 32]; // debugging with seed 0 first
         let mut rng_seed = rand::thread_rng();
@@ -162,7 +153,7 @@ fn main() {
         let mut rng = ChaCha12Rng::from_seed(seed);
         channel.send_block::<32>(&[seed]).expect("Failed to send seed to sender");
 
-        let origin = gen_origins(&mut rng, size);
+        let origin = gen_origins(&mut rng, SIZE);
         let mut data: Vec<[u128; DIMENSION]> = Vec::new();
 
         seed = [1u8; 32];
@@ -172,8 +163,8 @@ fn main() {
         let mut intersection_size = 0;
 
         origin.iter().for_each(|origin| {
+            let _point = gen_input(&mut rng);
             let mut point = gen_input(&mut rng);
-            point = gen_input(&mut rng);
             for j in 0..DIMENSION {
                 point[j] = point[j] % (1 << RANGE_BITS);
             }
@@ -215,10 +206,10 @@ fn main() {
 
         let start = Instant::now();
 
-        let mut sender_psi = SAPSISender::new(size, table_size);
-        sender_psi.send(&mut channel, &data, param, &mut comm);
+        let mut sender_psi = SAPSISender::new(TABLE_SIZE);
+        sender_psi.send(&mut channel, &data, param);
 
         println!("Sender finished in {:?}", start.elapsed());
-        println!("Total communication: {} bytes", comm);
+        println!("Total communication: {} bytes", channel.get_bytes_sent());
     }
 }

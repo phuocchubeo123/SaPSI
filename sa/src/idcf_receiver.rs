@@ -1,6 +1,6 @@
 use aes::Aes128;
 use aes::cipher::{KeyInit, BlockEncrypt, generic_array::GenericArray};
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_ot::pre_ot::OTPre;
 
 const NUM_BYTES: usize = 16;
@@ -36,7 +36,7 @@ impl IDCFReceiver {
     }
 
     // Here, alpha only has depth number of bits
-    pub fn receive<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<3>, comm: &mut u64) {
+    pub fn receive(&mut self, io: &mut TcpChannel, ot: &mut OTPre<3>) {
         // println!("Alpha bits: {:?}", &self.alpha[0..self.depth + 1]);
         let mut choices = vec![false; (self.depth + 1) * self.times];
         for time in 0..self.times {
@@ -45,19 +45,11 @@ impl IDCFReceiver {
             }
         }
 
-        ot.choices_recver(io, &choices, comm);
+        ot.choices_recver(io, &choices);
         ot.reset();
 
         let mut ot_msg = vec![[0u128; 3]; (self.depth + 1) * self.times];
-        ot.recv(io, &mut ot_msg, &choices, (self.depth + 1) * self.times, 0, comm);
-
-        // for time in 0..self.times {
-        //     for h in 0..self.depth + 1 {
-        //         println!("OT number: {}", time * (self.depth + 1) + h);
-        //         println!("OT choice: {}", choices[time * (self.depth + 1) + h]);
-        //         println!("OT message: {:?}", ot_msg[time * (self.depth + 1) + h]);
-        //     }
-        // }
+        ot.recv(io, &mut ot_msg, &choices, (self.depth + 1) * self.times, 0);
 
         for time in 0..self.times {
             for h in 0..self.depth + 1 {
@@ -80,17 +72,16 @@ impl IDCFReceiver {
         kg1[0] = 1u8;
         kc0[0] = 2u8;
         kc1[0] = 3u8;
-        let mut g0 = Aes128::new(GenericArray::from_slice(&kg0));
-        let mut g1 = Aes128::new(GenericArray::from_slice(&kg1));
-        let mut c0 = Aes128::new(GenericArray::from_slice(&kc0));
-        let mut c1 = Aes128::new(GenericArray::from_slice(&kc1));
+        let g0 = Aes128::new(GenericArray::from_slice(&kg0));
+        let g1 = Aes128::new(GenericArray::from_slice(&kg1));
+        let c0 = Aes128::new(GenericArray::from_slice(&kc0));
+        let c1 = Aes128::new(GenericArray::from_slice(&kc1));
 
         let mut missing_pos: usize = 0;
-        let mut fill_pos: usize = 0;
         for h in 1..self.depth + 1 {
             // Fill a_1 ... \bar{a_h} and fill next layer nodes
             missing_pos = (missing_pos << 1) | (self.alpha[time][h] as usize);
-            fill_pos = missing_pos ^ 1;
+            let fill_pos = missing_pos ^ 1;
             // println!("Missing position: {}", missing_pos);
             // println!("Fill position: {}", fill_pos);
             // Assign base GGM tree values and implementation tree values for the non-missing layer nodes
@@ -164,13 +155,6 @@ impl IDCFReceiver {
                     xor_block(&mut self.implementation_values[time][(1 << h) - 1 + (missing_pos | 1)], &val);
                 }
             }
-
-            // println!("Current layer implementation values after filling:");
-            // for i in 0..(1 << h) {
-            //     println!("{:?}", self.implementation_values[time][(1 << h) - 1 + i]);
-            // }
-
-
         }
 
         idcf_sharing[1] = self.implementation_values[time][1];
@@ -183,7 +167,7 @@ impl IDCFReceiver {
         }
     }
 
-    pub fn consistency_check<IO: CommunicationChannel>(&self, io: & mut IO, idcf_sharing: &[[u8; NUM_BYTES]], time: usize) {
+    pub fn consistency_check(&self, io: & mut TcpChannel, idcf_sharing: &[[u8; NUM_BYTES]], time: usize) {
         let beta = io.receive_u8().expect("Failed to receive beta in test");
         let sender_idcf_sharing = io.receive_block::<NUM_BYTES>().expect("Failed to receive IDCF sharing in test");
         // Check the consistency of the base GGM tree and implementation tree

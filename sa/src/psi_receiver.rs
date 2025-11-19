@@ -3,7 +3,7 @@ use crate::cuckoo::SimpleHash;
 use crate::idcf_sender::IDCFSender;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_volef2k::oprf_receiver_f2k::OprfReceiverF2k;
 use psi_volef2k::vole_triple_f2k::PrimalLPNParameterF2k;
 use rand::prelude::*;
@@ -11,22 +11,19 @@ use blake3;
 use std::collections::HashSet;
 use std::time::Instant;
 use std::cmp::max;
-use std::convert::TryInto;
 
 pub struct SAPSIReceiver {
-    n: usize,
     table_size: usize,
 }
 
 impl SAPSIReceiver {
-    pub fn new(n: usize, table_size: usize) -> Self {
+    pub fn new(table_size: usize) -> Self {
         SAPSIReceiver {
-            n,
             table_size,
         }
     }
 
-    pub fn receive<IO: CommunicationChannel>(&self, io: &mut IO, values: &[[u128; DIMENSION]], param: PrimalLPNParameterF2k, comm: &mut u64) {
+    pub fn receive(&self, io: &mut TcpChannel, values: &[[u128; DIMENSION]], param: PrimalLPNParameterF2k) {
         let mut processed_points: Vec<([u128; DIMENSION], [u128; DIMENSION])> = Vec::new();
         values.iter().for_each(|point| {
             let processed_point= preprocess_point(point);
@@ -42,33 +39,31 @@ impl SAPSIReceiver {
         let origins = processed_points.iter().map(|(origin, _)| *origin).collect::<Vec<[u128; DIMENSION]>>();
         
         let start = Instant::now();
-        let mut oprf_receiver = OprfReceiverF2k::<DIMENSION>::new(io, N << DIMENSION, param, comm);
+        let mut oprf_receiver = OprfReceiverF2k::<DIMENSION>::new(io, N << DIMENSION, param);
         println!("Receiver setup OPRF in {:?}", start.elapsed());
-        oprf_receiver.receive(io, &origins, comm);
+        oprf_receiver.receive(io, &origins);
         println!("Receiver computed OPRF in {:?}", start.elapsed());
 
-        let mut simple_table = SimpleHash::<DIMENSION>::new(self.table_size, 100000, LOC_FUNC_COUNT);
+        let mut simple_table = SimpleHash::<DIMENSION>::new(self.table_size, 100000);
         simple_table.generate_loc_funcs(LOC_FUNC_COUNT, Some([0u8; 16]));
         processed_points.iter().for_each(|(origin, transformed_point)| {
             let res: bool = simple_table.insert(origin, transformed_point);
             assert!(res, "Insertion failed");
         });
 
-        let mut idcf_table = Vec::<Vec<Vec<[u8; 16]>>>::new();
-
         // Prepare OTs
         let depth: usize = RANGE_BITS;
         let mut sender_cot = BaseCot::new(0, false); // Receiver has role Sender in the OTs
 
         // Set up the receiver's precomputation phase
-        sender_cot.cot_gen_pre(io, None, comm);
+        sender_cot.cot_gen_pre(io, None);
 
         // Original COT generation
         let size = depth + 1; // Number of COTs
         let times = self.table_size * DIMENSION * 2;
         // New COT generation using OTPre
         let mut sender_pre_ot = OTPre::<3>::new(size * times, 1);
-        sender_cot.cot_gen_preot(io, &mut sender_pre_ot, size * times, None, comm);
+        sender_cot.cot_gen_preot(io, &mut sender_pre_ot, size * times, None);
 
         // Sample random beta
         let mut beta = vec![[0u8; 16]; times];
@@ -103,17 +98,10 @@ impl SAPSIReceiver {
         println!("Receiver computed IDCF in {:?}", start.elapsed());
         
         let start = Instant::now();
-        idcf_sender.send(io, &mut sender_pre_ot, comm);
+        idcf_sender.send(io, &mut sender_pre_ot);
         println!("Receiver sent IDCF in {:?}", start.elapsed());
 
-        println!("Receiver communication after IDCF: {}", *comm);
-
-        // for index in 0..self.table_size {
-        //     for dim in 0..DIMENSION2 {
-        //         idcf_sender.consistency_check(io, &idcf_table[index][dim], index * DIMENSION2 + dim);
-        //     }
-        // }
-
+        println!("Receiver communication after IDCF: {}", io.get_bytes_sent());
 
         // Send the hash values
         let start = Instant::now();
@@ -122,7 +110,6 @@ impl SAPSIReceiver {
         // m * 2^DIMENSION * 3 * (6^DIMENSION)
 
         let mut max_bin_size = 0;
-        let mut total_size = 0;
         let mut num_hashes = 0;
         let mut to_be_hashed = Vec::<u8>::new();
         let mut prefixes_and_lengths = Vec::<([u128; DIMENSION], [usize; DIMENSION])>::new();
@@ -145,7 +132,7 @@ impl SAPSIReceiver {
                     to_be_hashed.clear();
                     to_be_hashed.extend_from_slice(&index.to_le_bytes());
                     let origin_oprf = oprf_receiver.get_output(origin).expect("Failed to get oprf output for receiver");
-                    for i in 0..DIMENSION {
+                    for _ in 0..DIMENSION {
                         to_be_hashed.extend_from_slice(&origin_oprf); // Change to OPRF later
                     }
                     for i in 0..DIMENSION {
@@ -179,7 +166,6 @@ impl SAPSIReceiver {
         }
 
         println!("Max bin size: {}", max_bin_size);
-        println!("Total size: {}", total_size);
         println!("Num hashes: {}", num_hashes);
 
         println!("Receiver computed hashes in {:?}", start.elapsed());
@@ -195,7 +181,7 @@ impl SAPSIReceiver {
 
 
         for index in 0..self.table_size {
-            *comm += io.send_block::<16>(&hash_vecs[index]).expect("Failed to send intersection hash");
+            io.send_block::<16>(&hash_vecs[index]).expect("Failed to send intersection hash");
             hash_vecs[index].clear();
         }
     }
@@ -212,7 +198,7 @@ fn preprocess_point(point: &[u128; DIMENSION]) -> Vec<([u128; DIMENSION], [u128;
         let mut universe_origin= grid_origin.clone();
         for i in 0..DIMENSION {
             if (mask >> i) & 1 == 1 {
-                universe_origin[i] -= (1 << (RANGE_BITS - 1));
+                universe_origin[i] -= 1 << (RANGE_BITS - 1);
             }
         }
         let mut transformed_point = [0u128; DIMENSION];

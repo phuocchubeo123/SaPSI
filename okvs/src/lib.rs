@@ -1,4 +1,3 @@
-extern crate lambdaworks_math;
 extern crate sp_core;
 extern crate thiserror;
 extern crate sha3;

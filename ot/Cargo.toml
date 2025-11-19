@@ -1,6 +1,6 @@
 [package]
 name = "psi-ot"
-version = "0.1.0"
+version = "0.2.0"
 
 [lib]
 name = "psi_ot"
@@ -18,3 +18,6 @@ name = "base_cot"
 
 [[bin]]
 name = "iknp"
+
+[[bin]]
+name = "ot"

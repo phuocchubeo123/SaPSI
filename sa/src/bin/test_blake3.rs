@@ -10,7 +10,7 @@ fn main() {
         let mut input = vec![0u8; i];
         rng.fill_bytes(&mut input);
         let start = Instant::now();
-        let hsh = blake3::hash(&input);
+        let _hsh = blake3::hash(&input);
         println!("Hashing time for {} bytes: {:?}", i, start.elapsed());
     }
 }

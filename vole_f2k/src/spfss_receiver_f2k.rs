@@ -40,8 +40,7 @@ impl SpfssRecverF2k {
 
     pub fn recv(&mut self, io: &mut TcpChannel, ot: &mut OTPre<1>, s: usize) {
         let mut receive_data = vec![[0u128; 1]; self.depth - 1];
-        ot.recv(io, &mut receive_data, &mut self.b, self.depth - 1, s)
-            .expect("OT receive failed");
+        ot.recv(io, &mut receive_data, &mut self.b, self.depth - 1, s);
 
         self.m = receive_data
             .iter()

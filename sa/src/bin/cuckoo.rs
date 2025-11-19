@@ -6,15 +6,15 @@ use rand::Rng;
 use std::convert::TryInto;
 
 const NUM_LIMBS: usize = 2;
-const size: usize = 10;
-const loc_func_count: usize = 3;
-const max_probe: usize = 10;
-const table_size: usize = 16;
+const SIZE: usize = 10;
+const LOC_FUNC_COUNT: usize = 3;
+const MAX_PROBE: usize = 10;
+const TABLE_SIZE: usize = 16;
 
 fn main() {
-    let mut items = [[0u128; NUM_LIMBS]; size];
+    let mut items = [[0u128; NUM_LIMBS]; SIZE];
     let mut rng = rand::thread_rng();
-    for i in 0..size {
+    for i in 0..SIZE {
         let mut rand_bytes = [0u8; 16*NUM_LIMBS];
         rng.fill(&mut rand_bytes);
         for j in 0..NUM_LIMBS {
@@ -23,8 +23,8 @@ fn main() {
     }
 
 
-    let mut cuckoo = CuckooHash::new(table_size, max_probe);
-    cuckoo.generate_loc_funcs(loc_func_count, None);
+    let mut cuckoo = CuckooHash::new(TABLE_SIZE, MAX_PROBE);
+    cuckoo.generate_loc_funcs(LOC_FUNC_COUNT, None);
     for item in items.iter() {
         let res: bool = cuckoo.insert(item, &[0u128; NUM_LIMBS]);
         println!("Insertion result: {}", res);

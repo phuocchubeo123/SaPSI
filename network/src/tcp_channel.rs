@@ -181,3 +181,22 @@ impl TcpChannel {
         self.bytes_received
     }
 }
+
+pub fn connect_with_retry_tcp(addr: &str) -> Result<TcpChannel> {
+    let stream = loop {
+        match TcpStream::connect(addr) {
+            Ok(s) => break s,
+            Err(_) => {
+                // Retry after a short delay
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        }
+    };
+    Ok(TcpChannel::new(stream))
+}
+
+pub fn listen_tcp(addr: &str) -> Result<TcpChannel> {
+    let listener = std::net::TcpListener::bind(addr)?;
+    let (stream, _) = listener.accept().map_err(|e| anyhow!("Failed to accept connection: {:?}", e))?;
+    Ok(TcpChannel::new(stream))
+}

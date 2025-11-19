@@ -3,12 +3,10 @@ extern crate psi_volef2k;
 extern crate rand;
 extern crate rand_chacha;
 
-use psi_network::tcp_channel::TcpChannel;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::{connect_with_retry_tcp, listen_tcp};
 use psi_volef2k::oprf_sender_f2k::OprfSenderF2k;
 use psi_volef2k::oprf_receiver_f2k::OprfReceiverF2k;
 use psi_volef2k::vole_triple_f2k::LPN16;
-use std::net::{TcpListener, TcpStream};
 use std::convert::TryInto;
 use rand::prelude::*;
 use rand_chacha::rand_core::{SeedableRng, RngCore};
@@ -26,14 +24,11 @@ fn main() {
 
     const SIZE: usize = 1 << 5;
     const KEY_DIM: usize = 2;
-    let mut comm: u64 = 0;
 
     if role == "receiver" {
         // Receiver logic
         // Listen for the sender
-        let listener = TcpListener::bind("127.0.0.1:8080").expect("Failed to bind to port");
-        let (stream, _) = listener.accept().expect("Failed to accept connection");
-        let mut channel = TcpChannel::new(stream);
+        let mut channel = listen_tcp("127.0.0.1:8080").expect("Failed to bind to port");
 
         let seed = channel.receive_block::<32>().expect("Failed to receive seed from sender");
         let mut rng = ChaCha12Rng::from_seed(seed[0]);
@@ -42,8 +37,8 @@ fn main() {
             x
         }).collect::<Vec<[u128; KEY_DIM]>>();
 
-        let mut oprf = OprfReceiverF2k::<KEY_DIM>::new(&mut channel, SIZE, LPN16, &mut comm);
-        oprf.receive(&mut channel, &data, &mut comm);
+        let mut oprf = OprfReceiverF2k::<KEY_DIM>::new(&mut channel, SIZE, LPN16);
+        oprf.receive(&mut channel, &data);
 
         data.iter().for_each(|x| {
             println!("Query for {:?}: {:?}", x, oprf.get_output(x));
@@ -51,8 +46,7 @@ fn main() {
     } else if role == "sender" {
         // Sender logic
         // Connect to the receiver
-        let stream = TcpStream::connect("127.0.1:8080").expect("Failed to connect to receiver");
-        let mut channel = TcpChannel::new(stream);
+        let mut channel = connect_with_retry_tcp("127.0.0.1:8080").expect("Failed to connect to receiver");
 
         // Send data to Sender for test
         let mut seed = [0u8; 32];
@@ -65,8 +59,8 @@ fn main() {
             x
         }).collect::<Vec<[u128; KEY_DIM]>>();
 
-        let mut oprf = OprfSenderF2k::<KEY_DIM>::new(&mut channel, SIZE, LPN16, &mut comm);
-        oprf.send(&mut channel, &data, &mut comm);
+        let mut oprf = OprfSenderF2k::<KEY_DIM>::new(&mut channel, SIZE, LPN16);
+        oprf.send(&mut channel, &data);
 
         data.iter().for_each(|x| {
             println!("Query for {:?}: {:?}", x, oprf.get_output(x));

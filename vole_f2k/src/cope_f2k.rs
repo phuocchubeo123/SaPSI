@@ -1,7 +1,7 @@
 use psi_ot::otco::OTCO;
-use psi_aes::prg::{F, PRG};
+use psi_aes::prg::PRG;
 use psi_utils::gf128::gf128mul;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 
 const NUM_BITS: usize = 128;
 
@@ -11,7 +11,6 @@ pub struct CopeF2k {
     delta_bool: [bool; NUM_BITS],
     prg_g0: Option<Vec<PRG>>,
     prg_g1: Option<Vec<PRG>>,
-    mask: u128,
     powers_of_two: Vec<u128>,
 }
 
@@ -24,7 +23,6 @@ impl CopeF2k {
             delta_bool: [false; NUM_BITS],
             prg_g0: None,
             prg_g1: None,
-            mask: u128::MAX,
             powers_of_two: vec![], // Initialize empty, will be filled in `initialize_*`
         }
     }
@@ -39,7 +37,7 @@ impl CopeF2k {
         self.powers_of_two = powers;
     }
 
-    pub fn initialize_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, delta: u128, comm: &mut u64) {
+    pub fn initialize_sender(&mut self, io: &mut TcpChannel, delta: u128) {
         self.delta = Some(delta);
         self.delta_bool = delta_to_bool(delta);
         self.precompute_powers_of_two(); // Precompute powers of two
@@ -47,14 +45,14 @@ impl CopeF2k {
         // Prepare keys using OTCO
         let mut k = Vec::new();
         let mut otco = OTCO::new();
-        otco.recv(io, &self.delta_bool, &mut k, comm);
+        otco.recv(io, &self.delta_bool, &mut k);
 
         // Initialize PRGs
         self.prg_g0 = Some(
             k.iter()
                 .enumerate()
                 .map(|(i, key)| {
-                    let mut prg = PRG::new(Some(key), (i + (self.delta_bool[i] as usize) * NUM_BITS) as u64);
+                    let prg = PRG::new(Some(key), (i + (self.delta_bool[i] as usize) * NUM_BITS) as u64);
                     prg
                 })
                 .collect(),
@@ -64,7 +62,7 @@ impl CopeF2k {
         assert_eq!(self.prg_g0.as_ref().unwrap().len(), NUM_BITS, "Mismatch in prg_g0 length after initialization");
     }
 
-    pub fn initialize_receiver<IO: CommunicationChannel>(&mut self, io: &mut IO, comm: &mut u64) {
+    pub fn initialize_receiver(&mut self, io: &mut TcpChannel) {
         self.precompute_powers_of_two(); // Precompute powers of two
 
         let mut k0 = vec![[0u8; 16]; NUM_BITS];
@@ -77,7 +75,7 @@ impl CopeF2k {
 
         // Use OTCO to send keys
         let mut otco = OTCO::new();
-        otco.send(io, &k0, &k1, comm);
+        otco.send(io, &k0, &k1);
 
         // Initialize PRGs
         self.prg_g0 = Some(
@@ -100,7 +98,7 @@ impl CopeF2k {
         );
     }
 
-    pub fn extend_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, comm: &mut u64) -> u128 {
+    pub fn extend_sender(&mut self, io: &mut TcpChannel) -> u128 {
         let mut w = vec![0u128; NUM_BITS];
 
         if let Some(prgs) = &mut self.prg_g0 {
@@ -115,7 +113,7 @@ impl CopeF2k {
         }
 
         // Receive v from the receiver
-        let mut v_bytes = io.receive_block::<16>().expect("Failed to receive v");
+        let v_bytes = io.receive_block::<16>().expect("Failed to receive v");
         let mut v = v_bytes
             .iter()
             .map(|&v_byte| u128::from_le_bytes(v_byte))
@@ -134,7 +132,7 @@ impl CopeF2k {
         self.prm2pr(&v)
     }
 
-    pub fn extend_sender_batch<IO: CommunicationChannel>(&mut self, io: &mut IO, ret: &mut [u128], size: usize, comm: &mut u64) {
+    pub fn extend_sender_batch(&mut self, io: &mut TcpChannel, ret: &mut [u128], size: usize) {
         // Generate ret_recv = ret_send + delta * u_recv
 
         let mut w = vec![vec![0u128; size]; NUM_BITS];
@@ -175,7 +173,7 @@ impl CopeF2k {
         self.prm2pr_batch(ret, &v);
     }
 
-    pub fn extend_receiver<IO: CommunicationChannel>(&mut self, io: &mut IO, u: u128, comm: &mut u64) -> u128 {
+    pub fn extend_receiver(&mut self, io: &mut TcpChannel, u: u128) -> u128 {
         let mut w0 = vec![0u128; NUM_BITS];
         let mut w1 = vec![0u128; NUM_BITS];
         let mut tau = vec![0u128; NUM_BITS];
@@ -202,13 +200,13 @@ impl CopeF2k {
             .iter()
             .map(|&tau_val| tau_val.to_le_bytes())
             .collect();
-        *comm += io.send_block::<16>(&tau_bytes).expect("Failed to send tau");
+        io.send_block::<16>(&tau_bytes).expect("Failed to send tau");
 
         // Aggregate w0 into a single field element
         self.prm2pr(&w0)
     }
 
-    pub fn extend_receiver_batch<IO: CommunicationChannel>(&mut self, io: &mut IO, ret: &mut [u128], u: &[u128], size: usize, comm: &mut u64) {
+    pub fn extend_receiver_batch(&mut self, io: &mut TcpChannel, ret: &mut [u128], u: &[u128], size: usize) {
         // Generate ret_recv = ret_send + delta * u_recv
 
         let mut w0 = vec![vec![0u128; size]; NUM_BITS];
@@ -239,8 +237,7 @@ impl CopeF2k {
             .iter()
             .map(|&tau_val| tau_val.to_le_bytes())
             .collect();
-        *comm += io.send_block::<16>(&tau_flat_bytes).expect("Failed to send tau");
-        io.flush();
+        io.send_block::<16>(&tau_flat_bytes).expect("Failed to send tau");
 
         // Aggregate w0 batch results into ret
         self.prm2pr_batch(ret, &w0);
@@ -264,7 +261,7 @@ impl CopeF2k {
     }
 
     // Debug
-    pub fn check_triple<IO: CommunicationChannel>(&mut self, io: &mut IO, a: &[u128], b: &[u128], sz: usize) {
+    pub fn check_triple(&mut self, io: &mut TcpChannel, a: &[u128], b: &[u128], sz: usize) {
         if self.party == 0 {
             // Sender's role
             let a_bytes = a.iter().map(|&x| x.to_le_bytes()).collect::<Vec<_>>();

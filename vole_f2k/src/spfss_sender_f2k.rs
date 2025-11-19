@@ -16,7 +16,6 @@ pub struct SpfssSenderF2k {
     m1: Vec<u128>,
     depth: usize,
     leave_n: usize,
-    prg: PRG,
 }
 
 impl SpfssSenderF2k {
@@ -35,7 +34,6 @@ impl SpfssSenderF2k {
             m1: vec![0; leave_n],
             depth,
             leave_n,
-            prg,
         }
     }
 
@@ -57,8 +55,8 @@ impl SpfssSenderF2k {
         io.send_block::<16>(&[self.secret_sum.to_le_bytes()]).expect("Failed to send secret sum");
     }
 
-    fn ggm_tree_gen(&mut self, ggm_tree_mem: &mut [u128], secret: u128, gamma: u128) {
-        let mut prp = TwoKeyPRPF2k::new([[0u8; 16], [1u8; 16]]);
+    fn ggm_tree_gen(&mut self, ggm_tree_mem: &mut [u128], _secret: u128, gamma: u128) {
+        let prp = TwoKeyPRPF2k::new([[0u8; 16], [1u8; 16]]);
         prp.expand_left(&[self.seed], &mut ggm_tree_mem[0..1]);
         prp.expand_right(&[self.seed], &mut ggm_tree_mem[1..2]);
         self.m0[0] = ggm_tree_mem[0];

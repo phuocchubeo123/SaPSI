@@ -3,7 +3,7 @@ use crate::lpn_f2k::LpnF2k;
 use crate::base_svole_f2k::BaseSvoleF2k;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_utils::gf128::gf128mul;
 use std::time::Instant;
 
@@ -110,31 +110,25 @@ pub struct VoleTripleF2k {
     m: usize,
     ot_used: usize,
     ot_limit: usize,
-    is_malicious: bool,
     extend_initialized: bool,
     pre_ot_inplace: bool,
 
     pre_y: Vec<u128>,
     pre_z: Vec<u128>,
-    pre_x: Vec<u128>,
     vole_y: Vec<u128>,
     vole_z: Vec<u128>,
-    vole_x: Vec<u128>,
 
     cot: BaseCot,
-    pre_ot: Option<OTPre<1>>,
 
     delta: u128,
 }
 
 impl VoleTripleF2k {
-    pub fn new<IO: CommunicationChannel>(party: usize, malicious: bool, io: &mut IO, param: PrimalLPNParameterF2k, comm: &mut u64) -> Self {
+    pub fn new(party: usize, malicious: bool, io: &mut TcpChannel, param: PrimalLPNParameterF2k) -> Self {
         let n_pre = param.n_pre;
-        let t_pre = param.t_pre;
         let n = param.n;
-        let t = param.t;
         let mut cot = BaseCot::new(party, malicious);
-        cot.cot_gen_pre(io, None, comm);
+        cot.cot_gen_pre(io, None);
 
         VoleTripleF2k {
             party: party,
@@ -142,44 +136,40 @@ impl VoleTripleF2k {
             m: 0,
             ot_used: 0,
             ot_limit: 0,
-            is_malicious: malicious,
             extend_initialized: false,
             pre_ot_inplace: false,
 
             pre_y: vec![0u128; n_pre],
             pre_z: vec![0u128; n_pre],
-            pre_x: vec![0u128; t_pre + 1],
             vole_y: vec![0u128; n],
             vole_z: vec![0u128; n],
-            vole_x: vec![0u128; t + 1],
 
             cot: cot,
-            pre_ot: None,
 
             delta: 0u128,
         }
     }
 
-    pub fn extend_send<IO: CommunicationChannel>(&mut self, io: &mut IO, y: &mut [u128], mpfss: &mut MpfssRegF2k, pre_ot: &mut OTPre<1>, lpn: &mut LpnF2k, key: &[u128], t: usize, comm: &mut u64) {
+    pub fn extend_send(&mut self, io: &mut TcpChannel, y: &mut [u128], mpfss: &mut MpfssRegF2k, pre_ot: &mut OTPre<1>, lpn: &mut LpnF2k, key: &[u128], t: usize) {
         mpfss.sender_init(self.delta);
-        mpfss.mpfss_sender(io, pre_ot, key, y, comm);
+        mpfss.mpfss_sender(io, pre_ot, key, y);
         pre_ot.reset();
 
         // // y is already a regular vector (concat of n/t unit vectors), which corresponses to the noise in LPN
         lpn.compute_send(y, &key[t+1..]);
     }
 
-    pub fn extend_recv<IO: CommunicationChannel>(&mut self, io: &mut IO, y: &mut [u128], z: &mut [u128], mpfss: &mut MpfssRegF2k, pre_ot: &mut OTPre<1>, lpn: &mut LpnF2k, mac: &[u128], u: &[u128], t: usize, comm: &mut u64) {
+    pub fn extend_recv(&mut self, io: &mut TcpChannel, y: &mut [u128], z: &mut [u128], mpfss: &mut MpfssRegF2k, pre_ot: &mut OTPre<1>, lpn: &mut LpnF2k, mac: &[u128], u: &[u128], t: usize) {
         mpfss.receiver_init();
-        mpfss.mpfss_receiver(io, pre_ot, mac, u, y, z, comm);
+        mpfss.mpfss_receiver(io, pre_ot, mac, u, y, z);
         pre_ot.reset();
         lpn.compute_recv(y, z, &mac[t+1..], &u[t+1..]);
     }
 
-    pub fn setup_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, delta: u128, comm: &mut u64) {
+    pub fn setup_sender(&mut self, io: &mut TcpChannel, delta: u128) {
         self.delta = delta;
         let delta_bytes = delta.to_le_bytes();
-        *comm += io.send_block::<16>(&[delta_bytes]).expect("Cannot send test delta"); //debug only
+        io.send_block::<16>(&[delta_bytes]).expect("Cannot send test delta"); //debug only
 
         let seed_pre0 = [0u8; 16];
         // let seed_field_pre0 = [[0u8; 16]; 4];
@@ -191,20 +181,16 @@ impl VoleTripleF2k {
         let mut pre_ot_ini0 = OTPre::<1>::new(self.param.log_bin_sz_pre0, self.param.t_pre0);
 
         let m_pre0 = self.param.log_bin_sz_pre0 * self.param.t_pre0;
-        self.cot.cot_gen_preot(io, &mut pre_ot_ini0, m_pre0, None, comm);
+        self.cot.cot_gen_preot(io, &mut pre_ot_ini0, m_pre0, None);
 
         // mac = key + delta * u
         let triple_n0 = 1 + self.param.t_pre0 + self.param.k_pre0;
         let mut key = vec![0u128; triple_n0];
-        let mut svole0 = BaseSvoleF2k::new_sender(io, self.delta, comm);
-        svole0.triple_gen_send(io, &mut key, triple_n0, comm);
-
-        // println!("Test base svole: {:?}", key[0]);
-
-        io.flush();
+        let mut svole0 = BaseSvoleF2k::new_sender(io, self.delta);
+        svole0.triple_gen_send(io, &mut key, triple_n0);
 
         let mut pre_y0 = vec![0u128; self.param.n_pre0];
-        self.extend_send(io, &mut pre_y0, &mut mpfss_pre0, &mut pre_ot_ini0, &mut lpn_pre0, &key, self.param.t_pre0, comm);
+        self.extend_send(io, &mut pre_y0, &mut mpfss_pre0, &mut pre_ot_ini0, &mut lpn_pre0, &key, self.param.t_pre0);
 
         // println!("Test LPN: {:?}", pre_y0[0]);
 
@@ -218,18 +204,18 @@ impl VoleTripleF2k {
         let mut pre_ot_ini = OTPre::new(self.param.log_bin_sz_pre, self.param.t_pre);
 
         let m_pre = self.param.log_bin_sz_pre * self.param.t_pre;
-        self.cot.cot_gen_preot(io, &mut pre_ot_ini, m_pre, None, comm);
+        self.cot.cot_gen_preot(io, &mut pre_ot_ini, m_pre, None);
 
         // 
         let triple_n = 1 + self.param.t_pre + self.param.k_pre;        
         let mut pre_y = vec![0u128; self.param.n_pre];
-        self.extend_send(io, &mut pre_y, &mut mpfss_pre, &mut pre_ot_ini, &mut lpn_pre, &pre_y0[..triple_n], self.param.t_pre, comm);
+        self.extend_send(io, &mut pre_y, &mut mpfss_pre, &mut pre_ot_ini, &mut lpn_pre, &pre_y0[..triple_n], self.param.t_pre);
         self.pre_y.copy_from_slice(&pre_y);
 
         self.pre_ot_inplace = true;
     }
 
-    pub fn setup_receiver<IO: CommunicationChannel>(&mut self, io: &mut IO, comm: &mut u64) {
+    pub fn setup_receiver(&mut self, io: &mut TcpChannel) {
         let start = Instant::now();
         let delta_bytes = io.receive_block::<16>().expect("Failed to receive test delta");
         self.delta = u128::from_le_bytes(delta_bytes[0]);
@@ -243,7 +229,7 @@ impl VoleTripleF2k {
         let mut pre_ot_ini0 = OTPre::new(self.param.log_bin_sz_pre0, self.param.t_pre0);
 
         let m_pre0 = self.param.log_bin_sz_pre0 * self.param.t_pre0;
-        self.cot.cot_gen_preot(io, &mut pre_ot_ini0, m_pre0, None, comm);
+        self.cot.cot_gen_preot(io, &mut pre_ot_ini0, m_pre0, None);
 
         // mac = key + delta * u
         let triple_n0 = 1 + self.param.t_pre0 + self.param.k_pre0;
@@ -252,18 +238,14 @@ impl VoleTripleF2k {
 
         println!("Time for cot gen preot: {:?}", start.elapsed());
 
-        let mut svole0 = BaseSvoleF2k::new_receiver(io, comm);
-        svole0.triple_gen_recv(io, &mut mac, &mut u, triple_n0, comm);
+        let mut svole0 = BaseSvoleF2k::new_receiver(io);
+        svole0.triple_gen_recv(io, &mut mac, &mut u, triple_n0);
 
         println!("Time for svole0: {:?}", start.elapsed()); 
 
-        // println!("Test base svole: {:?}", mac[0] - u[0] * self.delta);
-
-        io.flush();
-
         let mut pre_y0 = vec![0u128; self.param.n_pre0];
         let mut pre_z0 = vec![0u128; self.param.n_pre0];
-        self.extend_recv(io, &mut pre_y0, &mut pre_z0, &mut mpfss_pre0, &mut pre_ot_ini0, &mut lpn_pre0, &mac, &u, self.param.t_pre0, comm);
+        self.extend_recv(io, &mut pre_y0, &mut pre_z0, &mut mpfss_pre0, &mut pre_ot_ini0, &mut lpn_pre0, &mac, &u, self.param.t_pre0);
 
         let seed_pre = [0u8; 16];
         let mut seed_field_pre = [0u8; 16];
@@ -274,7 +256,7 @@ impl VoleTripleF2k {
         let mut pre_ot_ini = OTPre::new(self.param.log_bin_sz_pre, self.param.t_pre);
 
         let m_pre = self.param.log_bin_sz_pre * self.param.t_pre;
-        self.cot.cot_gen_preot(io, &mut pre_ot_ini, m_pre, None, comm);
+        self.cot.cot_gen_preot(io, &mut pre_ot_ini, m_pre, None);
 
         println!("Time for cot gen preot: {:?}", start.elapsed());
 
@@ -282,7 +264,7 @@ impl VoleTripleF2k {
         let triple_n = 1 + self.param.t_pre + self.param.k_pre;        
         let mut pre_y = vec![0u128; self.param.n_pre];
         let mut pre_z = vec![0u128; self.param.n_pre];
-        self.extend_recv(io, &mut pre_y, &mut pre_z, &mut mpfss_pre, &mut pre_ot_ini, &mut lpn_pre, &pre_y0[..triple_n], &pre_z0[..triple_n], self.param.t_pre, comm);
+        self.extend_recv(io, &mut pre_y, &mut pre_z, &mut mpfss_pre, &mut pre_ot_ini, &mut lpn_pre, &pre_y0[..triple_n], &pre_z0[..triple_n], self.param.t_pre);
         self.pre_y.copy_from_slice(&pre_y);
         self.pre_z.copy_from_slice(&pre_z);
 
@@ -296,22 +278,22 @@ impl VoleTripleF2k {
         self.extend_initialized = true;
     }
 
-    pub fn extend_once<IO: CommunicationChannel>(&mut self, io: &mut IO, data_y: &mut [u128], data_z: &mut [u128], mpfss: &mut MpfssRegF2k, pre_ot: &mut OTPre<1>, lpn: &mut LpnF2k, comm: &mut u64) {
-        self.cot.cot_gen_preot(io, pre_ot, self.param.t * self.param.log_bin_sz, None, comm);
+    pub fn extend_once(&mut self, io: &mut TcpChannel, data_y: &mut [u128], data_z: &mut [u128], mpfss: &mut MpfssRegF2k, pre_ot: &mut OTPre<1>, lpn: &mut LpnF2k) {
+        self.cot.cot_gen_preot(io, pre_ot, self.param.t * self.param.log_bin_sz, None);
         let mut pre_y = vec![0u128; self.m];
         pre_y.copy_from_slice(&self.pre_y[..self.m]);
         let mut pre_z = vec![0u128; self.m];
         pre_z.copy_from_slice(&self.pre_z[..self.m]);
         if self.party == 0{
-            self.extend_send(io, data_y, mpfss, pre_ot, lpn, &pre_y, self.param.t, comm);
+            self.extend_send(io, data_y, mpfss, pre_ot, lpn, &pre_y, self.param.t);
         } else {
-            self.extend_recv(io, data_y, data_z, mpfss, pre_ot, lpn, &pre_y, &pre_z, self.param.t, comm);
+            self.extend_recv(io, data_y, data_z, mpfss, pre_ot, lpn, &pre_y, &pre_z, self.param.t);
         }
         self.pre_y[..self.m].copy_from_slice(&data_y[self.ot_limit..]);
         self.pre_z[..self.m].copy_from_slice(&data_z[self.ot_limit..]);
     }
 
-    pub fn extend<IO: CommunicationChannel>(&mut self, io: &mut IO, data_y: &mut [u128], data_z: &mut [u128], num: usize, comm: &mut u64) {
+    pub fn extend(&mut self, io: &mut TcpChannel, data_y: &mut [u128], data_z: &mut [u128], num: usize) {
         if self.extend_initialized == false {
             panic!("Run extend_initialization first!");
         }
@@ -349,8 +331,8 @@ impl VoleTripleF2k {
         let mut mpfss = MpfssRegF2k::new(self.param.n, self.param.t, self.param.log_bin_sz, self.party); 
         mpfss.set_malicious();
 
-        for i in 0..round_inplace {
-            self.extend_once(io, &mut data_y[copied..copied+self.param.n], &mut data_z[copied..copied+self.param.n], &mut mpfss, &mut pre_ot, &mut lpn, comm);
+        for _ in 0..round_inplace {
+            self.extend_once(io, &mut data_y[copied..copied+self.param.n], &mut data_z[copied..copied+self.param.n], &mut mpfss, &mut pre_ot, &mut lpn);
             self.ot_used = self.ot_limit;
             copied += self.ot_limit;
         }
@@ -358,7 +340,7 @@ impl VoleTripleF2k {
         if round_memcpy {
             let mut tmp_y = vec![0u128; self.param.n];
             let mut tmp_z = vec![0u128; self.param.n];
-            self.extend_once(io, &mut tmp_y, &mut tmp_z, &mut mpfss, &mut pre_ot, &mut lpn, comm);
+            self.extend_once(io, &mut tmp_y, &mut tmp_z, &mut mpfss, &mut pre_ot, &mut lpn);
             self.vole_y.copy_from_slice(&tmp_y);
             self.vole_z.copy_from_slice(&tmp_z);
             data_y[copied..copied+self.ot_limit].copy_from_slice(&tmp_y[..self.ot_limit]);
@@ -370,7 +352,7 @@ impl VoleTripleF2k {
         if last_round_ot > 0 {
             let mut tmp_y = vec![0u128; self.param.n];
             let mut tmp_z = vec![0u128; self.param.n];
-            self.extend_once(io, &mut tmp_y, &mut tmp_z, &mut mpfss, &mut pre_ot, &mut lpn, comm);
+            self.extend_once(io, &mut tmp_y, &mut tmp_z, &mut mpfss, &mut pre_ot, &mut lpn);
             self.vole_y.copy_from_slice(&tmp_y);
             self.vole_z.copy_from_slice(&tmp_z);
             data_y[copied..].copy_from_slice(&tmp_y[..last_round_ot]);
@@ -384,7 +366,7 @@ impl VoleTripleF2k {
     }
 
     // debug only
-    pub fn check_triple<IO: CommunicationChannel>(&self, io: &mut IO, x: u128, y: &[u128], z: &[u128], size: usize) {
+    pub fn check_triple(&self, io: &mut TcpChannel, x: u128, y: &[u128], z: &[u128], size: usize) {
         if self.party == 0 {
             let x_bytes = x.to_le_bytes();
             let y_bytes = y.iter().map(|&v| v.to_le_bytes()).collect::<Vec<_>>();

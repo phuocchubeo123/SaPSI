@@ -39,7 +39,7 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
             rng.fill(&mut sd);
         }
 
-        let mut aes = Aes128::new(GenericArray::from_slice(&sd));
+        let aes = Aes128::new(GenericArray::from_slice(&sd));
         let mut aes_blocks: Vec<_> = (0..loc_func_count)
             .map(|i| {
                 let mut block = [0u8; 16];
@@ -120,10 +120,10 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
             let mut loc_bytes = [0u8; 8];
             let mut rng = rand::thread_rng();
             rng.fill(&mut loc_bytes);
-            let mut rand_loc_func_index = usize::from_le_bytes(loc_bytes) % self.loc_funcs.len();
+            let  rand_loc_func_index = usize::from_le_bytes(loc_bytes) % self.loc_funcs.len();
             let swap_location = self.location(&curr_key, rand_loc_func_index);
             
-            let mut temp = self.table[swap_location];
+            let temp = self.table[swap_location];
             self.table[swap_location] = (curr_key, curr_value);
             (curr_key, curr_value) = temp;
             level -= 1;
@@ -153,7 +153,7 @@ pub struct SimpleHash<const NUM_LIMBS: usize> {
 
 impl<const NUM_LIMBS: usize> SimpleHash<NUM_LIMBS> {
     // Constructor to initialize the hash table with a given size and number of locations
-    pub fn new(table_size: usize, max_bin_size: usize, loc_func_count: usize) -> Self {
+    pub fn new(table_size: usize, max_bin_size: usize) -> Self {
         Self {
             table: vec![vec![]; table_size],
             loc_funcs: vec![],
@@ -173,7 +173,7 @@ impl<const NUM_LIMBS: usize> SimpleHash<NUM_LIMBS> {
             rng.fill(&mut sd);
         }
 
-        let mut aes = Aes128::new(GenericArray::from_slice(&sd));
+        let aes = Aes128::new(GenericArray::from_slice(&sd));
         let mut aes_blocks: Vec<_> = (0..loc_func_count)
             .map(|i| {
                 let mut block = [0u8; 16];

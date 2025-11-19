@@ -18,7 +18,7 @@ fn main() {
     const KEY_DIM: usize = 2;
 
     let mut inputs: Vec<Pair<[u128; KEY_DIM], u128>> = Vec::with_capacity(size);
-    for i in 0..size {
+    for _ in 0..size {
         let key: [u128; KEY_DIM] = (0..KEY_DIM).map(|_| rand_u128()).collect::<Vec<u128>>().try_into().unwrap();
         let value = rand_u128();
         inputs.push((key, value));

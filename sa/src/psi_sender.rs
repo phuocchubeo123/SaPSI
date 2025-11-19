@@ -1,35 +1,32 @@
 use crate::config::*;
-use crate::cuckoo::{CuckooHash, SimpleHash}; 
+use crate::cuckoo::CuckooHash; 
 use crate::idcf_receiver::IDCFReceiver;
 use std::time::Instant;
 use std::vec;
 use std::collections::HashSet;
 use psi_ot::base_cot::BaseCot;
 use psi_ot::pre_ot::OTPre;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_volef2k::oprf_sender_f2k::OprfSenderF2k;
 use psi_volef2k::vole_triple_f2k::PrimalLPNParameterF2k;
-use rand::prelude::*;
 use blake3;
 
 // URGENT: Need to implement OPRF
 
 pub struct SAPSISender {
-    n: usize,
     table_size: usize,
     intersection: HashSet<[u128; DIMENSION]>,
 }
 
 impl SAPSISender {
-    pub fn new(n: usize, table_size: usize) -> Self {
+    pub fn new(table_size: usize) -> Self {
         SAPSISender {
-            n,
             table_size,
             intersection: HashSet::new(),
         }
     }
 
-    pub fn send<IO: CommunicationChannel>(&mut self, io: &mut IO, values: &[[u128; DIMENSION]], param: PrimalLPNParameterF2k, comm: &mut u64) {
+    pub fn send(&mut self, io: &mut TcpChannel, values: &[[u128; DIMENSION]], param: PrimalLPNParameterF2k) {
         // All (origin, recentered_point) pairs
         let processed_points: Vec<([u128; DIMENSION], [u128; DIMENSION])> = values.iter()
             .map(|point| preprocess_point(point))
@@ -40,8 +37,8 @@ impl SAPSISender {
         let origins = processed_points.iter()
             .map(|(origin, _)| *origin)
             .collect::<Vec<[u128; DIMENSION]>>();
-        let mut oprf_sender= OprfSenderF2k::<DIMENSION>::new(io, N << DIMENSION, param, comm);
-        oprf_sender.send(io, &origins, comm);
+        let mut oprf_sender= OprfSenderF2k::<DIMENSION>::new(io, N << DIMENSION, param);
+        oprf_sender.send(io, &origins);
 
         // Prepare cuckoo hash table
         let mut cuckoo_table = CuckooHash::<DIMENSION>::new(self.table_size, 100);
@@ -65,7 +62,7 @@ impl SAPSISender {
         let mut receiver_cot = BaseCot::new(1, false);
 
         // Set up the receiver's precomputation phase
-        receiver_cot.cot_gen_pre(io, None, comm);
+        receiver_cot.cot_gen_pre(io, None);
 
         // Original COT generation
         let size = depth + 1; // Number of COTs
@@ -78,7 +75,7 @@ impl SAPSISender {
         }
         // New COT generation using OTPre
         let mut receiver_pre_ot = OTPre::<3>::new(size * times, 1);
-        receiver_cot.cot_gen_preot(io, &mut receiver_pre_ot, size * times, Some(&choice_bits), comm);
+        receiver_cot.cot_gen_preot(io, &mut receiver_pre_ot, size * times, Some(&choice_bits));
 
         let mut idcf_receiver = IDCFReceiver::new(depth, times);
         for index in 0..self.table_size {
@@ -100,7 +97,7 @@ impl SAPSISender {
             }
         }
 
-        idcf_receiver.receive(io, &mut receiver_pre_ot, comm);
+        idcf_receiver.receive(io, &mut receiver_pre_ot);
 
         let start = Instant::now();
 
@@ -235,7 +232,7 @@ impl SAPSISender {
         let mut to_be_hashed = Vec::<u8>::new();
         to_be_hashed.extend_from_slice(&index.to_le_bytes());
         let origin_oprf = oprf.get_output(origin).expect("Failed to get oprf output sender");  
-        for i in 0..DIMENSION {
+        for _ in 0..DIMENSION {
             to_be_hashed.extend_from_slice(&origin_oprf); // Change to OPRF later
         }
         for i in 0..DIMENSION2 {

@@ -1,16 +1,15 @@
 [workspace]
-members = ["vole", "aes", "okvs", "sa", "ot", "network", "utils", "vole_f2k"]
+members = ["aes", "okvs", "sa", "ot", "network", "utils", "vole_f2k"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 license = "MIT"
 
 [workspace.dependencies]
-psi-vole = { path = "./vole", version = "0.1.0"}
-psi-okvs = { path = "./okvs", version = "0.1.0"}
-psi-aes = { path = "./aes", version = "0.1.0"}
-psi-sa = { path = "./sa", version = "0.1.0"}
-psi-ot = { path = "./ot", version = "0.1.0"}
-psi-network = { path = "./network", version = "0.1.0"}
-psi-utils = { path = "./utils", version = "0.1.0"}
-psi-volef2k = { path = "./vole_f2k", version = "0.1.0"}
+psi-okvs = { path = "./okvs", version = "0.2.0"}
+psi-aes = { path = "./aes", version = "0.2.0"}
+psi-sa = { path = "./sa", version = "0.2.0"}
+psi-ot = { path = "./ot", version = "0.2.0"}
+psi-network = { path = "./network", version = "0.2.0"}
+psi-utils = { path = "./utils", version = "0.2.0"}
+psi-volef2k = { path = "./vole_f2k", version = "0.2.0"}

@@ -3,24 +3,18 @@ use psi_utils::gf128::gf128mul;
 
 pub struct LpnF2k {
     party: usize,
-    k: usize, 
-    n: usize,
-    M: Vec<u128>,
-    preM: Vec<u128>,
-    K: Vec<u128>,
-    preK: Vec<u128>,
-    A_idx: Vec<[usize; 10]>,
-    A_weight: Vec<[u128; 10]>,
+    big_a_idx: Vec<[usize; 10]>,
+    big_a_weight: Vec<[u128; 10]>,
 }
 
 impl LpnF2k {
     pub fn new(k: usize, n: usize, seed: &[u8; 16], seed_field: &[u8; 16]) -> Self {
         let prp = PRP::new(Some(seed));
         let field_prp = PRP::new(Some(seed_field));
-        let mut A_idx = vec![[0usize; 10]; n];
-        let mut A_weight = vec![[0u128; 10]; n];
+        let mut big_a_idx = vec![[0usize; 10]; n];
+        let mut big_a_weight = vec![[0u128; 10]; n];
 
-        A_idx.iter_mut().zip(A_weight.iter_mut()).enumerate().for_each(|(i, (r, w))| {
+        big_a_idx.iter_mut().zip(big_a_weight.iter_mut()).enumerate().for_each(|(i, (r, w))| {
             let mut tmp = vec![[0u8; 16]; 10];
             let mut tmp2 = vec![[0u8; 16]; 10];
             for m in 0..10 {
@@ -40,7 +34,7 @@ impl LpnF2k {
 
             field_prp.permute_block(&mut tmp2, 10);
 
-            let mut tmp_field: Vec<_> = tmp2
+            let tmp_field: Vec<_> = tmp2
                 .iter()
                 .map(|x| u128::from_le_bytes(*x))
                 .collect();
@@ -49,41 +43,35 @@ impl LpnF2k {
 
         Self {
             party: 0,
-            k: k,
-            n: n,
-            M: vec![0u128; n],
-            preM: vec![0u128; k],
-            K: vec![0u128; n],
-            preK: vec![0u128; k],
-            A_idx: A_idx,
-            A_weight: A_weight,
+            big_a_idx,
+            big_a_weight,
         }
     }
 
-    pub fn compute_K(&mut self, K: &mut [u128], kkK: &[u128]) {
-        K.iter_mut().enumerate().for_each(|(i, Ki)| {
+    pub fn compute_big_k(&mut self, big_k: &mut [u128], kk_big_k: &[u128]) {
+        big_k.iter_mut().enumerate().for_each(|(i, big_ki)| {
             for m in 0..10 {
-                *Ki ^= gf128mul(self.A_weight[i][m], kkK[self.A_idx[i][m]]);
+                *big_ki ^= gf128mul(self.big_a_weight[i][m], kk_big_k[self.big_a_idx[i][m]]);
             }
         });
     }
 
-    pub fn compute_K_and_M(&mut self, K: &mut [u128], M: &mut [u128], kkK: &[u128], kkM: &[u128]) {
-        K.iter_mut().zip(M.iter_mut()).enumerate().for_each(|(i, (Ki, Mi))| {
+    pub fn compute_big_k_and_big_m(&mut self, big_k: &mut [u128], big_m: &mut [u128], kk_big_k: &[u128], kk_big_m: &[u128]) {
+        big_k.iter_mut().zip(big_m.iter_mut()).enumerate().for_each(|(i, (big_ki, big_mi))| {
             for m in 0..10 {
-                *Ki ^= gf128mul(self.A_weight[i][m], kkK[self.A_idx[i][m]]);
-                *Mi ^= gf128mul(self.A_weight[i][m], kkM[self.A_idx[i][m]]);
+                *big_ki ^= gf128mul(self.big_a_weight[i][m], kk_big_k[self.big_a_idx[i][m]]);
+                *big_mi ^= gf128mul(self.big_a_weight[i][m], kk_big_m[self.big_a_idx[i][m]]);
             }
         });
     }
 
-    pub fn compute_send(&mut self, K: &mut [u128], kkK: &[u128]) {
+    pub fn compute_send(&mut self, big_k: &mut [u128], kk_big_k: &[u128]) {
         self.party = 0;
-        self.compute_K(K, kkK);
+        self.compute_big_k(big_k, kk_big_k);
     }
 
-    pub fn compute_recv(&mut self, K: &mut [u128], M: &mut [u128], kkK: &[u128], kkM: &[u128]) {
+    pub fn compute_recv(&mut self, big_k: &mut [u128], big_m: &mut [u128], kk_big_k: &[u128], kk_big_m: &[u128]) {
         self.party = 1;
-        self.compute_K_and_M(K, M, kkK, kkM);
+        self.compute_big_k_and_big_m(big_k, big_m, kk_big_k, kk_big_m);
     }
 }

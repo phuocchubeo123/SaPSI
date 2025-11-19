@@ -2,15 +2,12 @@ use crate::spfss_sender_f2k::SpfssSenderF2k;
 use crate::spfss_receiver_f2k::SpfssRecverF2k;
 use psi_aes::prg::PRG;
 use psi_ot::pre_ot::OTPre;
-use psi_network::comm_channel::CommunicationChannel;
+use psi_network::tcp_channel::TcpChannel;
 use psi_utils::gf128::gf128mul;
 use blake3;
 
 pub struct MpfssRegF2k {
     party: usize,
-    item_n: usize,
-    idx_max: usize, 
-    m: usize,
     tree_height: usize,
     leave_n: usize,
     tree_n: usize,
@@ -27,14 +24,13 @@ pub struct MpfssRegF2k {
 
 impl MpfssRegF2k {
     pub fn new(n: usize, t: usize, log_bin_sz: usize, party: usize) -> Self {
+        let leave_n = 1 << log_bin_sz;
+        assert_eq!(n, t * leave_n);
         // make sure n = t * leave_n
         MpfssRegF2k {
             party: party,
-            item_n: t,
-            idx_max: n,
-            m: 0,
             tree_height: log_bin_sz + 1,
-            leave_n: 1 << log_bin_sz,
+            leave_n: leave_n,
             tree_n: t,
             is_malicious: false,
             prg: PRG::new(None, 0),
@@ -66,29 +62,27 @@ impl MpfssRegF2k {
         }
     }
 
-    pub fn mpfss_sender<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<1>, triple_y: &[u128], sparse_vector: &mut [u128], comm: &mut u64) {
+    pub fn mpfss_sender(&mut self, io: &mut TcpChannel, ot: &mut OTPre<1>, triple_y: &[u128], sparse_vector: &mut [u128]) {
         // triple_y_recv = triple_y_send + delta * triple_z
 
         self.triple_y.copy_from_slice(&triple_y[..self.tree_n+1]);
 
         // Set up PreOT first
-        for i in 0..self.tree_n {
-            ot.choices_sender(io, comm);
+        for _ in 0..self.tree_n {
+            ot.choices_sender(io);
         }
-        io.flush();
         ot.reset();
 
         let mut seeds = vec![0u128; self.tree_n];
         if self.is_malicious {
-            self.seed_expand(io, &mut seeds, self.tree_n, comm);
+            self.seed_expand(io, &mut seeds, self.tree_n);
         }
-        io.flush();
 
         // Now start doing Spfss
         for i in 0..self.tree_n {
             let mut sender = SpfssSenderF2k::new(self.tree_height);
             sender.compute(&mut self.ggm_tree[i], self.secret_share_x, self.triple_y[i]);
-            sender.send(io, ot, i, comm);
+            sender.send(io, ot, i);
             sparse_vector[i*self.leave_n..(i+1)*self.leave_n].copy_from_slice(&self.ggm_tree[i]);
 
             // Malicious check
@@ -112,32 +106,31 @@ impl MpfssRegF2k {
             let hash = blake3::hash(&vb.to_le_bytes());
             let mut h = [0u8; 32];
             h.copy_from_slice(hash.as_bytes());
-            *comm += io.send_block::<32>(&[h]).expect("Failed to send h");
+            io.send_block::<32>(&[h]).expect("Failed to send h");
         }
     }
 
-    pub fn mpfss_receiver<IO: CommunicationChannel>(&mut self, io: &mut IO, ot: &mut OTPre<1>, triple_y: &[u128], triple_z: &[u128], sparse_vector_y: &mut [u128], sparse_vector_z: &mut [u128], comm: &mut u64) {
+    pub fn mpfss_receiver(&mut self, io: &mut TcpChannel, ot: &mut OTPre<1>, triple_y: &[u128], triple_z: &[u128], sparse_vector_y: &mut [u128], sparse_vector_z: &mut [u128]) {
         // triple_y_recv = triple_y_send + delta * triple_z
 
         self.triple_y.copy_from_slice(&triple_y[..self.tree_n+1]);
         self.triple_z.copy_from_slice(&triple_z[..self.tree_n+1]);
 
-        for i in 0..self.tree_n {
+        for _ in 0..self.tree_n {
             let b = vec![false; self.tree_height - 1];
-            ot.choices_recver(io, &b, comm);
+            ot.choices_recver(io, &b);
         }
-        io.flush();
         ot.reset();
 
         let mut seeds = vec![0u128; self.tree_n];
         if self.is_malicious {
-            self.seed_expand(io, &mut seeds, self.tree_n, comm);
+            self.seed_expand(io, &mut seeds, self.tree_n);
         }
 
         for i in 0..self.tree_n {
             let mut receiver = SpfssRecverF2k::new(self.tree_height);
             self.item_pos_receiver[i] = receiver.get_index();
-            receiver.recv(io, ot, i, comm);
+            receiver.recv(io, ot, i);
             receiver.compute(&mut self.ggm_tree[i], self.triple_y[i]);
             sparse_vector_y[i*self.leave_n..(i+1)*self.leave_n].copy_from_slice(&self.ggm_tree[i]);
             for j in i*self.leave_n..(i+1)*self.leave_n {
@@ -157,7 +150,7 @@ impl MpfssRegF2k {
             }
             let x_star = self.triple_z[self.tree_n] ^ beta_mul_chialpha;
             let x_star_bytes = x_star.to_le_bytes();
-            *comm += io.send_block::<16>(&[x_star_bytes]).expect("Cannot send x_star.");
+            io.send_block::<16>(&[x_star_bytes]).expect("Cannot send x_star.");
 
             let mut va = 0u128;
             va ^= self.triple_y[self.tree_n];
@@ -178,16 +171,16 @@ impl MpfssRegF2k {
 
     }
 
-    pub fn seed_expand<IO: CommunicationChannel>(&mut self, io: &mut IO, seed: &mut [u128], threads: usize, comm: &mut u64) {
-        let mut sd = [0u8; 16];
-        if self.party == 0 {
-            sd = io.receive_block::<16>().expect("Failed to receive seed")[0];
-        } else {
-            let mut sd_buf = vec![[0u8; 16]; 1];
-            self.prg.random_16byte_block(&mut sd_buf);
-            sd = sd_buf[0].clone();
-            *comm += io.send_block::<16>(&[sd]).expect("Failed to send seed");
-        }
+    pub fn seed_expand(&mut self, io: &mut TcpChannel, seed: &mut [u128], threads: usize) {
+        let sd = if self.party == 0 {
+                io.receive_block::<16>().expect("Failed to receive seed")[0]
+            } else {
+                let mut sd_buf = vec![[0u8; 16]; 1];
+                self.prg.random_16byte_block(&mut sd_buf);
+                let sd = sd_buf[0].clone();
+                io.send_block::<16>(&[sd]).expect("Failed to send seed");
+                sd
+            };
         let mut prg2 = PRG::new(Some(&sd), 0);
         let mut seed_bytes = vec![[0u8; 16]; seed.len()];
         prg2.random_16byte_block(&mut seed_bytes);
