@@ -9,6 +9,12 @@ The code is well tested for Rust 1.84.0. Simply git clone this repository and bu
 As we do not run this protocol multithreaded, the sender and the receiver are ran on the same machine, with enough number of cores so that the two parties do not fight for resources.
 To simulate WAN, we use the Linux command tc.
 
+# Data generation
+To generate synthetic data, run:
+> cargo run --release --bin data_generator -- --set-size [balanced_set_size] --intersection-size [intersection_size] --output-sender [sender-data-file] --output-receiver [receiver-data-file]
+
+Note that, we currently only support set sizes 2^8, 2^12, 2^16.
+
 # How to use
 To run the project: 
 
@@ -25,13 +31,12 @@ To run the project:
 Note that, the config.rs file on the machine that runs the sender should be identical to the config.rs file on the machine that runs the receiver.
 We will support runtime config in the future.
 
-2. Run the following codes on two terminal tabs (or on two different machines). Note that, in this code, the receiver is the Tcp Listener, the code for receiver should be ran first.
-Support for retrying to connect to Tcp will be added in the future.
-> cargo run --release --bin psi [role] [port]
+2. Run the following codes on two terminal tabs (or on two different machines). 
+> cargo run --release --bin psi -- --role [role] --address [addr] --port [port] --size [same_size_as_generated] --input-file [data_file]
 
 Examples for running receiver/sender:
-> cargo run --release --bin psi receiver 8080 </br>
-> cargo run --release --bin psi sender 8080 
+> cargo run --release --bin psi -- --role sender --address 127.0.0.1 --port 1234 --size 4096 --input-file data/sender.txt </br>
+> cargo run --release --bin psi -- --role receiver --address 127.0.0.1 --port 1234 --size 4096 --input-file data/receiver.txt
 
 # Components of the code
 ## aes
@@ -66,6 +71,9 @@ This directory contains the code for Structure-Aware PSI and the implementation 
 
 ## utils 
 This directory contains a simple implementation of the field GF(128). This implementation naively does multiplication, so a lot of optimization (such as SIMD instructions) can be done here.
+
+## vole_f2k
+This directory includes all implementations for VOLE, used in the OPRF phase to generate ids for each miniuniverse.
 
 # Choosing parameters for LPN in VOLE extension
 We modify the published code of the following paper: https://eprint.iacr.org/2022/712.pdf.

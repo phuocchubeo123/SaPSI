@@ -6,8 +6,8 @@ use blake3;
 
 pub type Pair<K, V> = (K, V);
 
-const EPSILON: f64 = 3.0; // can change
-const BAND_WIDTH: usize = 220; // can change
+const EPSILON: f64 = 0.5; // can change
+const BAND_WIDTH: usize = 200; // can change
 pub struct RbOkvsF2k<const KEY_DIM: usize> {
     pub columns: usize,
     band_width: usize,
