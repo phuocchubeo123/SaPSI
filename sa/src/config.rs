@@ -12,4 +12,4 @@ pub const RADIUS: usize = RADIUS_PARAM[RADIUS_PARAM_CHOOSE].0;
 pub const RANGE_BITS: usize = RADIUS_PARAM[RADIUS_PARAM_CHOOSE].1; // RANGE = 2^RANGE_BITS
 pub const LOC_FUNC_COUNT: usize = 3;
 pub const PREF_LENGTH: &[usize] = RADIUS_PARAM[RADIUS_PARAM_CHOOSE].2;
-pub const N: usize = 1 << 8;
+pub const N: usize = 1 << 12;

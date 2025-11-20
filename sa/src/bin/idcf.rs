@@ -68,7 +68,7 @@ fn main() {
         // Now generate the IDCF
         let beta = [5u8; 16];
         let mut key = [0u8; 16];
-        let mut rng_seed = rand::thread_rng();
+        let mut rng_seed = rand::rng();
         rng_seed.fill(&mut key);
         let mut idcf_sender = IDCFSender::new(DEPTH, 1);
 

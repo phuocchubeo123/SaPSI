@@ -3,68 +3,26 @@ extern crate psi_network;
 extern crate psi_volef2k;
 extern crate rand;
 extern crate rand_chacha;
+extern crate clap;
 
 use psi_sa::config::*;
 use psi_sa::psi_sender::SAPSISender;
 use psi_sa::psi_receiver::SAPSIReceiver;
 use psi_network::tcp_channel::{connect_with_retry_tcp, listen_tcp};
-use psi_volef2k::vole_triple_f2k::{LPN12, LPN16, LPN20};
-use std::env;
-use std::collections::HashSet;
+use psi_volef2k::vole_triple_f2k::{LPN12, LPN16, LPN20, PrimalLPNParameterF2k};
 use std::time::Instant;
-use rand::prelude::*;
-use rand_chacha::rand_core::{SeedableRng, RngCore};
-use rand_chacha::ChaCha12Rng;
+use clap::Parser;
 
-fn gen_input(rng: &mut ChaCha12Rng) -> [u128; DIMENSION] {
-    let mut res = [0u128; DIMENSION];
-    for i in 0..DIMENSION {
-        res[i] = (rng.next_u64() as u128) << 64 | (rng.next_u64() as u128);
-    }
-    res
-}
-
-fn gen_origins(rng: &mut ChaCha12Rng, size: usize) -> Vec<[u128; DIMENSION]> {
-    // Generate random origins first
-    let pre_origin= (0..size).map(|_| gen_input(rng)).collect::<Vec<[u128; DIMENSION]>>();
-    let mut origins_set: HashSet<[u128; DIMENSION]> = HashSet::new();
-    pre_origin.iter().for_each(|point| {
-        origins_set.insert(get_origin(point));
-    });
-    let mut origins: Vec<[u128; DIMENSION]> = Vec::new();
-    origins_set.iter().for_each(|point| {
-        origins.push(*point);
-    });
-    origins.sort();
-    origins
-}
-
-fn get_origin(point: &[u128; DIMENSION]) -> [u128; DIMENSION] {
-    let mut origin = [0u128; DIMENSION];
-    for i in 0..DIMENSION {
-        origin[i] = point[i];
-        origin[i] = (origin[i] >> RANGE_BITS) << RANGE_BITS;
-    }
-    origin
-}
-
-
-fn main() {
-    let role = env::args().nth(1).expect("Please specify 'sender' or 'receiver' as an argument");
-    let port = env::args().nth(2).expect("Please specify the port as an argument");
-
-    const SIZE: usize = N;
-    const TABLE_SIZE: usize = ((SIZE as f32) * 1.5) as usize;
-    let param = if SIZE == 1 << 8 {
+fn param_checking(size: usize) -> PrimalLPNParameterF2k{
+    let param = if size == 1 << 8 {
             LPN12
-        } else if SIZE == 1 << 12 {
+        } else if size == 1 << 12 {
             LPN16
-        } else if SIZE == 1 << 16 {
+        } else if size == 1 << 16 {
             LPN20
         } else {
             panic!("Invalid size, only accept 2^8, 2^12, or 2^16");
         };
-
     if RADIUS == 10 {
         if RANGE_BITS != 6 {
             panic!("RADIUS = 10, but RANGE_BITS != 6");
@@ -104,109 +62,85 @@ fn main() {
         panic!("Invalid RADIUS");
     }
 
-    println!("Running PSI with size: {}, table_size: {}, radius: {}, dimension: {}", SIZE, TABLE_SIZE, RADIUS, DIMENSION);
+    param
+}
+
+fn load_points_from_file(file_path: &str) -> Vec<[u128; DIMENSION]> {
+    let mut points: Vec<[u128; DIMENSION]> = Vec::new();
+    let content = std::fs::read_to_string(file_path).expect("Unable to read file");
+    for line in content.lines() {
+        let trimmed = line.trim_matches(|c: char| c == '[' || c == ']' || c.is_whitespace());
+        let nums: Vec<u128> = trimmed.split(',').map(|s| s.trim().parse().expect("Unable to parse number")).collect();
+        if nums.len() != DIMENSION {
+            panic!("Invalid point dimension in file");
+        }
+        let mut point = [0u128; DIMENSION];
+        for i in 0..DIMENSION {
+            point[i] = nums[i];
+        }
+        points.push(point);
+    }
+    points
+}
+
+#[derive(Parser)]
+struct Args {
+    #[clap(long)]
+    role: String,
+    #[clap(long)]
+    address: String,
+    #[clap(long)]
+    port: String,
+    #[clap(long)]
+    size: usize,
+    #[clap(long)]
+    input_file: String,
+}
+
+fn main() {
+    let args = Args::parse();
+    let role = args.role;
+    let address = args.address;
+    let port = args.port;
+    let size = args.size;
+    let table_size = ((size as f32) * 1.5) as usize;
+    let input_file = args.input_file;
+
+    assert_eq!(size, N, "Size must be equal to N defined in config.rs");
+
+    println!("Running PSI with size: {}, table_size: {}, radius: {}, dimension: {}", size, table_size, RADIUS, DIMENSION);
+
+    let param = param_checking(size);
+    let data = load_points_from_file(&input_file);
+
+    println!("Is there duplicates in input data? {}", {
+        let mut set = std::collections::HashSet::new();
+        let mut has_duplicates = false;
+        for point in data.iter() {
+            if !set.insert(point) {
+                has_duplicates = true;
+                break;
+            }
+        }
+        has_duplicates
+    });
+
 
     if role == "receiver" {
         println!("Starting as Receiver...");
-        let mut channel = listen_tcp(&format!("127.0.0.1:{}", port)).expect("Failed to listen on port");
-
-        let seed = channel.receive_block::<32>().expect("Failed to receive seed from receiver");
-        let mut rng = ChaCha12Rng::from_seed(seed[0]);
-        let origins = gen_origins(&mut rng, SIZE);
-        let mut data: Vec<[u128; DIMENSION]> = Vec::new();
-
-        origins.iter().for_each(|origin| {
-            let mut point = gen_input(&mut rng);
-            for j in 0..DIMENSION {
-                point[j] = point[j] % (1 << RANGE_BITS);
-            }
-            // println!("Origin: {:?}, Point: {:?}", origin, point);
-            for j in 0..DIMENSION {
-                point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];
-            }
-            data.push(point);
-
-            for dim in 0..DIMENSION {
-                let mut x_bytes = [0u8; 16];
-                x_bytes.copy_from_slice(&point[dim].to_le_bytes());
-                channel.send_block::<16>(&[x_bytes]).expect("Failed to send x bytes");
-            }
-
-            // println!("Point 1: {:?}", point);
-            // println!("Point 2: {:?}", point2);
-
-        });
-
+        let mut channel = listen_tcp(&format!("{}:{}", address, port)).expect("Failed to listen on address");
         let start = Instant::now();
 
-        let receiver_psi = SAPSIReceiver::new(TABLE_SIZE);
+        let receiver_psi = SAPSIReceiver::new(table_size);
         receiver_psi.receive(&mut channel, &data, param);
 
         println!("Receiver finished in {:?}", start.elapsed());
         println!("Total communication: {} bytes", channel.get_bytes_sent());
     } else if role == "sender" {
-        let mut channel = connect_with_retry_tcp(&format!("127.0.0.1:{}", port)).expect("Failed to connect to receiver");
-
-        let mut seed = [2u8; 32]; // debugging with seed 0 first
-        let mut rng_seed = rand::thread_rng();
-        rng_seed.fill(&mut seed);
-        let mut rng = ChaCha12Rng::from_seed(seed);
-        channel.send_block::<32>(&[seed]).expect("Failed to send seed to sender");
-
-        let origin = gen_origins(&mut rng, SIZE);
-        let mut data: Vec<[u128; DIMENSION]> = Vec::new();
-
-        seed = [1u8; 32];
-        rng_seed.fill(&mut seed);
-        rng = ChaCha12Rng::from_seed(seed);
-
-        let mut intersection_size = 0;
-
-        origin.iter().for_each(|origin| {
-            let _point = gen_input(&mut rng);
-            let mut point = gen_input(&mut rng);
-            for j in 0..DIMENSION {
-                point[j] = point[j] % (1 << RANGE_BITS);
-            }
-            // println!("Origin: {:?}, Point: {:?}", origin, point);
-            for j in 0..DIMENSION {
-                point[j] = (point[j] % (1 << RANGE_BITS)) + origin[j];
-            }
-            data.push(point);
-
-            // println!("Point: {:?}", point);
-
-            let mut point2 = [0u128; DIMENSION];
-            for dim in 0..DIMENSION {
-                let x_bytes = channel.receive_block::<16>().expect("Failed to receive x bytes");
-                point2[dim] = u128::from_le_bytes(x_bytes[0]);
-            }
-            let mut in_range = true;
-            for dim in 0..DIMENSION {
-                if (point2[dim] + (RADIUS as u128) < point[dim]) || (point2[dim] > point[dim] + (RADIUS as u128)) {
-                    in_range = false;
-                    break;
-                }
-            }
-            if in_range {
-                intersection_size += 1;
-                let mut recentered_point = [0u128; DIMENSION];
-                for dim in 0..DIMENSION {
-                    recentered_point[dim] = point[dim] - origin[dim];
-                }
-                let mut recentered_point2 = [0u128; DIMENSION];
-                for dim in 0..DIMENSION {
-                    recentered_point2[dim] = point2[dim] - origin[dim];
-                }
-                // println!("Intersection: Origin: {:?}, Point: {:?}, Point2: {:?}", origin, recentered_point, recentered_point2);
-            }
-        });
-
-        println!("Intersection size: {}", intersection_size);
-
+        let mut channel = connect_with_retry_tcp(&format!("{}:{}", address, port)).expect("Failed to connect to receiver");
         let start = Instant::now();
 
-        let mut sender_psi = SAPSISender::new(TABLE_SIZE);
+        let mut sender_psi = SAPSISender::new(table_size);
         sender_psi.send(&mut channel, &data, param);
 
         println!("Sender finished in {:?}", start.elapsed());

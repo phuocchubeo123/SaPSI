@@ -6,8 +6,8 @@ use blake3;
 
 pub type Pair<K, V> = (K, V);
 
-const EPSILON: f64 = 1.0; // can change
-const BAND_WIDTH: usize = 200; // can change
+const EPSILON: f64 = 3.0; // can change
+const BAND_WIDTH: usize = 220; // can change
 pub struct RbOkvsF2k<const KEY_DIM: usize> {
     pub columns: usize,
     band_width: usize,
@@ -18,6 +18,7 @@ pub struct RbOkvsF2k<const KEY_DIM: usize> {
 impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
     pub fn new(kv_count: usize, r1: &[u8; 16], r2: &[u8; 16]) -> Self {
         let columns = ((1.0 + EPSILON) * kv_count as f64) as usize;
+        println!("kv_count: {}, columns: {}", kv_count, columns);
 
         Self {
             columns,
@@ -72,12 +73,7 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
             *start_pos_i = (i, self.hash_to_index(&input[i].0, &self.r1, self.columns - self.band_width));
         });
 
-        println!("Start pos: {:?}", &start_pos[..5]);
-
         radix_sort(&mut start_pos, self.columns - self.band_width - 1);
-
-        println!("Start pos: {:?}", &start_pos[..5]);
-
 
         matrix.iter_mut().enumerate().for_each(|(i, matrix_i)| {
             *matrix_i = self.hash_to_band(&input[start_pos[i].0].0, &self.r2);
@@ -126,7 +122,6 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
         let mut first_nonzero = vec![band_width; rows];
 
         for i in 0..rows {
-            let y_i = y[i];
             for j in 0..band_width {
                 if bands_bool[i][j] {
                     first_nonzero[i] = j;
@@ -134,7 +129,12 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
                 }
             }
 
+            // println!("First nonzero of row {} is {}", i, first_nonzero[i]);
+            // println!("Band bool: {:?}", bands_bool[i]);
+            // println!("Original band: {:?}", bands[i]);
+
             if first_nonzero[i] == band_width {
+                println!("Row {} is zero row", i);
                 return Err(Error::ZeroRow(i));
             }
 
@@ -152,7 +152,7 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
                     for k in 0..(band_width - first_nonzero[i]) {
                         bands_bool[j][k + offset] ^= bands_bool_i[k + first_nonzero[i]];
                     }
-                    y[j] ^= y_i;
+                    y[j] ^= y[i];
                 }
 
             }
@@ -200,6 +200,7 @@ impl<const KEY_DIM: usize> RbOkvsF2k<KEY_DIM> {
         });
         hasher.update(r2);
         let hash = hasher.finalize();
-        U256::from_little_endian(hash.as_bytes())
+        let output = U256::from_little_endian(hash.as_bytes());
+        output
     }
 }

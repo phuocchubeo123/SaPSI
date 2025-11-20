@@ -37,6 +37,7 @@ impl SAPSISender {
         let origins = processed_points.iter()
             .map(|(origin, _)| *origin)
             .collect::<Vec<[u128; DIMENSION]>>();
+
         let mut oprf_sender= OprfSenderF2k::<DIMENSION>::new(io, N << DIMENSION, param);
         oprf_sender.send(io, &origins);
 

@@ -37,7 +37,7 @@ impl SAPSIReceiver {
 
         // Run OPRF for the origins
         let origins = processed_points.iter().map(|(origin, _)| *origin).collect::<Vec<[u128; DIMENSION]>>();
-        
+
         let start = Instant::now();
         let mut oprf_receiver = OprfReceiverF2k::<DIMENSION>::new(io, N << DIMENSION, param);
         println!("Receiver setup OPRF in {:?}", start.elapsed());
@@ -68,7 +68,7 @@ impl SAPSIReceiver {
         // Sample random beta
         let mut beta = vec![[0u8; 16]; times];
         let mut key = vec![[0u8; 16]; times];
-        let mut rng_seed = rand::thread_rng();
+        let mut rng_seed = rand::rng();
         for i in 0..times {
             rng_seed.fill(&mut beta[i]);
             rng_seed.fill(&mut key[i]);

@@ -13,7 +13,7 @@ const TABLE_SIZE: usize = 16;
 
 fn main() {
     let mut items = [[0u128; NUM_LIMBS]; SIZE];
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     for i in 0..SIZE {
         let mut rand_bytes = [0u8; 16*NUM_LIMBS];
         rng.fill(&mut rand_bytes);

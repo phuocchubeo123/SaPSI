@@ -35,7 +35,7 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
         if let Some(s) = seed {
             sd.copy_from_slice(&s);
         } else {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             rng.fill(&mut sd);
         }
 
@@ -118,7 +118,7 @@ impl<const NUM_LIMBS: usize> CuckooHash<NUM_LIMBS> {
 
             // Sample a random location to push out the current item in the table
             let mut loc_bytes = [0u8; 8];
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             rng.fill(&mut loc_bytes);
             let  rand_loc_func_index = usize::from_le_bytes(loc_bytes) % self.loc_funcs.len();
             let swap_location = self.location(&curr_key, rand_loc_func_index);
@@ -169,7 +169,7 @@ impl<const NUM_LIMBS: usize> SimpleHash<NUM_LIMBS> {
         if let Some(s) = seed {
             sd.copy_from_slice(&s);
         } else {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             rng.fill(&mut sd);
         }
 
